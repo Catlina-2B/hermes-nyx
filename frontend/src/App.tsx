@@ -8,6 +8,7 @@ import ChatPanel from "./components/ChatPanel";
 import LogPanel from "./components/LogPanel";
 import TodoPanel from "./components/TodoPanel";
 import DashboardGrid, { type DragEvent } from "./components/DashboardGrid";
+import DragEffectsCanvas, { type DragEffectsHandle } from "./components/DragEffectsCanvas";
 import DigitalHumanPanel from "./plugins/vrm-digital-human/DigitalHumanPanel";
 import { frontendPlugins } from "./plugins/registry";
 import type { ChatDirectiveHandler } from "./plugins/types";
@@ -18,10 +19,10 @@ export default function App() {
   const logs = useLogs();
   const { todos, add, toggle, remove } = useTodos();
   const grid = useGridLayout();
+  const effectsRef = useRef<DragEffectsHandle>(null);
 
   const handleDragEvent = useCallback((event: DragEvent) => {
-    // Will be connected to Canvas effects in Task 7
-    void event;
+    effectsRef.current?.onDragEvent(event);
   }, []);
 
   const gridChildren = [
@@ -99,6 +100,8 @@ export default function App() {
           <div key={plugin.id}>{plugin.renderOverlay({ chatDirectiveRef })}</div>
         ) : null,
       )}
+
+      <DragEffectsCanvas ref={effectsRef} />
     </div>
   );
 }
