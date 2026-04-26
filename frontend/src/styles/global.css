@@ -38,3 +38,35 @@ body {
 .glow-text {
   text-shadow: 0 0 8px rgba(0, 255, 200, 0.4);
 }
+
+/* react-grid-layout overrides */
+.react-grid-layout {
+  position: relative;
+}
+
+.react-grid-item {
+  transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.react-grid-item.cssTransforms {
+  transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.react-grid-item.react-draggable-dragging {
+  transition: none;
+  z-index: 40;
+  opacity: 0.92;
+  box-shadow: 0 0 30px rgba(0, 255, 200, 0.25), 0 0 60px rgba(0, 255, 200, 0.1);
+  border-radius: 8px;
+}
+
+.react-grid-placeholder {
+  background: rgba(0, 255, 200, 0.08) !important;
+  border: 2px dashed rgba(0, 255, 200, 0.3) !important;
+  border-radius: 8px;
+  box-shadow: 0 0 20px rgba(0, 255, 200, 0.1);
+}
+
+.react-grid-item > .react-resizable-handle {
+  display: none;
+}
