@@ -143,24 +143,40 @@ export default function App() {
     defaultPos,
   );
 
-  // Compute fluid layout — when avatar is on desktop, panels fill the full space
+  // Compute fluid layout — responsive to container size
   const layout = useMemo(() => {
-    if (containerSize.w <= 0) return null;
+    const cw = containerSize.w;
+    const ch = containerSize.h;
+    if (cw <= 0) return null;
+    const g = 6; // gap
+
     if (!showAvatarInWebUI) {
-      // No avatar in WebUI — give all space to panels
-      // Chat takes left ~75%, log+todo stack on the right
-      const sideW = 320;
-      const chatW = containerSize.w - sideW - 6;
+      // No avatar — responsive layout for chat + log + todo
+      if (cw < 640) {
+        // Narrow: stack vertically (chat top, log+todo bottom)
+        const chatH = ch * 0.6;
+        const sideH = ch - chatH - g;
+        return {
+          chat: { x: 0, y: 0, w: cw, h: chatH },
+          log:  { x: 0, y: chatH + g, w: cw * 0.6 - g / 2, h: sideH },
+          todo: { x: cw * 0.6 + g / 2, y: chatH + g, w: cw * 0.4 - g / 2, h: sideH },
+        };
+      }
+      // Normal: chat left, sidebar right (proportional width)
+      const sideW = Math.min(320, Math.max(200, cw * 0.25));
+      const chatW = cw - sideW - g;
       return {
-        chat: { x: 0, y: 0, w: chatW, h: containerSize.h },
-        log:  { x: chatW + 6, y: 0, w: sideW, h: containerSize.h * 0.65 },
-        todo: { x: chatW + 6, y: containerSize.h * 0.65 + 6, w: sideW, h: containerSize.h * 0.35 - 6 },
+        chat: { x: 0, y: 0, w: chatW, h: ch },
+        log:  { x: chatW + g, y: 0, w: sideW, h: ch * 0.65 },
+        todo: { x: chatW + g, y: ch * 0.65 + g, w: sideW, h: ch * 0.35 - g },
       };
     }
+
+    // Avatar in webui — fluid layout
     return computeFluidLayout(
       { x: pos.x, y: pos.y, w: AVATAR_W, h: AVATAR_H },
-      containerSize.w,
-      containerSize.h,
+      cw,
+      ch,
     );
   }, [pos.x, pos.y, containerSize.w, containerSize.h, showAvatarInWebUI]);
 
