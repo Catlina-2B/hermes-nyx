@@ -42,7 +42,11 @@ export default function SpotlightApp() {
 
   // Detect if user is asking about screen content
   const isScreenQuestion = useCallback((text: string) => {
-    const keywords = ["屏幕", "看到", "这个", "当前", "这是什么", "这里", "界面", "页面", "screen", "what is this", "这段"];
+    const keywords = [
+      "屏幕", "看到", "在看", "看什么", "看啥", "这个", "当前", "这是什么", "这里",
+      "界面", "页面", "这段", "这行", "这块", "干什么", "干嘛", "在做", "做什么", "做啥",
+      "screen", "what is this", "looking at", "what am i",
+    ];
     return keywords.some((kw) => text.toLowerCase().includes(kw));
   }, []);
 
