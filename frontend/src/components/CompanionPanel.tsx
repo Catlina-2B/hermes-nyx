@@ -50,9 +50,9 @@ export default function CompanionPanel() {
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
         {history.length === 0 && (
           <div className="text-center text-xs text-cyber-muted py-4 font-mono">
-            // 暂无分析记录
+            // 暂无观察记录
             <br />
-            <span className="text-[10px]">按 ⌘⇧S 截屏分析</span>
+            <span className="text-[10px]">⌘⇧S 立即分析</span>
           </div>
         )}
         {history.map((entry, i) => (

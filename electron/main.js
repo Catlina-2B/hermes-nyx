@@ -430,7 +430,7 @@ async function captureAndAnalyze() {
   if (!imageBase64) {
     console.log("[companion] captureScreen returned null");
     if (companionWindow) {
-      companionWindow.webContents.send("companion:message", { text: "看不到你的屏幕呢，检查下录屏权限？" });
+      companionWindow.webContents.send("companion:message", { text: "嗯...看不太清，权限可能有问题" });
     }
     return;
   }
@@ -625,7 +625,7 @@ function createTray() {
       },
     },
     {
-      label: "立即截屏分析 (⌘⇧S)",
+      label: "立即观察 (⌘⇧S)",
       click: () => captureAndAnalyze(),
     },
     { type: "separator" },
