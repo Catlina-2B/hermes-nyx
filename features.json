@@ -175,7 +175,7 @@
             "转为 base64 PNG",
             "权限被拒绝时友好提示"
           ],
-          "passes": false
+          "passes": true
         },
         {
           "id": "F013",
@@ -188,7 +188,7 @@
             "Prompt: 描述用户在做什么，判断是否需要主动交流",
             "返回分析结果 + 是否主动说话 + 说话内容"
           ],
-          "passes": false
+          "passes": true
         },
         {
           "id": "F014",
@@ -201,7 +201,7 @@
             "AI 决定主动说话时推送到悬浮窗气泡",
             "用户快捷键 Cmd+Shift+S 立即截屏分析"
           ],
-          "passes": false
+          "passes": true
         },
         {
           "id": "F015",
@@ -215,7 +215,7 @@
             "签名配置（开发阶段可跳过）",
             "测试 .app 能正常启动和运行"
           ],
-          "passes": false
+          "passes": true
         }
       ]
     }
