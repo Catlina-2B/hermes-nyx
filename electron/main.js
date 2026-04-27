@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen } = require("electron");
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen, globalShortcut } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
 const http = require("http");
@@ -26,6 +26,7 @@ const FRONTEND_URL = IS_DEV
 // ---------------------------------------------------------------------------
 let mainWindow = null;
 let companionWindow = null;
+let spotlightWindow = null;
 let tray = null;
 let backendProcess = null;
 let isQuitting = false;
@@ -284,6 +285,94 @@ function setupCompanionIPC() {
   ipcMain.on("companion:drag-end", () => {
     companionDragStart = null;
   });
+
+  // Spotlight IPC
+  ipcMain.on("spotlight:hide", () => {
+    if (spotlightWindow) spotlightWindow.hide();
+  });
+
+  ipcMain.on("spotlight:expand", () => {
+    if (spotlightWindow) {
+      spotlightWindow.setSize(600, 420);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Spotlight Window (Cmd+Shift+H)
+// ---------------------------------------------------------------------------
+
+function createSpotlightWindow() {
+  const display = screen.getPrimaryDisplay();
+  const { width: screenW } = display.workAreaSize;
+
+  spotlightWindow = new BrowserWindow({
+    width: 600,
+    height: 60,
+    x: Math.round((screenW - 600) / 2),
+    y: 200,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    show: false,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  const spotlightURL = IS_DEV
+    ? `${BACKEND_URL}/spotlight.html`
+    : `file://${path.join(process.resourcesPath, "frontend-dist", "spotlight.html")}`;
+
+  spotlightWindow.loadURL(spotlightURL);
+
+  spotlightWindow.on("blur", () => {
+    spotlightWindow.hide();
+    // Reset size for next show
+    spotlightWindow.setSize(600, 60);
+  });
+
+  spotlightWindow.on("closed", () => {
+    spotlightWindow = null;
+  });
+
+  console.log("[spotlight] Window created (hidden)");
+}
+
+function toggleSpotlight() {
+  if (!spotlightWindow) {
+    createSpotlightWindow();
+    spotlightWindow.show();
+    spotlightWindow.focus();
+    return;
+  }
+
+  if (spotlightWindow.isVisible()) {
+    spotlightWindow.hide();
+    spotlightWindow.setSize(600, 60);
+  } else {
+    // Re-center
+    const display = screen.getPrimaryDisplay();
+    const { width: screenW } = display.workAreaSize;
+    spotlightWindow.setPosition(Math.round((screenW - 600) / 2), 200);
+    spotlightWindow.setSize(600, 60);
+    spotlightWindow.show();
+    spotlightWindow.focus();
+  }
+}
+
+function registerGlobalShortcuts() {
+  globalShortcut.register("CommandOrControl+Shift+H", () => {
+    console.log("[shortcut] Cmd+Shift+H pressed");
+    toggleSpotlight();
+  });
+
+  console.log("[shortcuts] Global shortcuts registered");
 }
 
 // ---------------------------------------------------------------------------
@@ -375,12 +464,15 @@ app.on("ready", async () => {
 
   createMainWindow();
   createCompanionWindow();
+  createSpotlightWindow();
   setupCompanionIPC();
+  registerGlobalShortcuts();
   createTray();
 });
 
 app.on("before-quit", () => {
   isQuitting = true;
+  globalShortcut.unregisterAll();
   stopBackend();
 });
 

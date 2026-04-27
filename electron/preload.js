@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld("hermesDesktop", {
     ipcRenderer.on("companion:message", (_event, data) => callback(data));
   },
 
+  // Spotlight controls
+  hideSpotlight: () => ipcRenderer.send("spotlight:hide"),
+  spotlightExpand: () => ipcRenderer.send("spotlight:expand"),
+
   // Platform info
   platform: process.platform,
 });
