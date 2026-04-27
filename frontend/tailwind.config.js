@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  content: ["./index.html", "./companion.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
       colors: {
@@ -13,6 +13,15 @@ export default {
           error: "#ff3355",
           text: "#e0e6ed",
           muted: "#6b7a8d",
+        },
+      },
+      animation: {
+        "fade-in": "fadeIn 0.3s ease-out",
+      },
+      keyframes: {
+        fadeIn: {
+          "0%": { opacity: "0", transform: "translateX(-50%) translateY(-8px)" },
+          "100%": { opacity: "1", transform: "translateX(-50%) translateY(0)" },
         },
       },
       fontFamily: {

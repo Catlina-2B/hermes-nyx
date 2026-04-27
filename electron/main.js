@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage } = require("electron");
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
 const http = require("http");
@@ -25,9 +25,11 @@ const FRONTEND_URL = IS_DEV
 // State
 // ---------------------------------------------------------------------------
 let mainWindow = null;
+let companionWindow = null;
 let tray = null;
 let backendProcess = null;
 let isQuitting = false;
+let companionDragStart = null; // { winX, winY } at drag start
 
 // ---------------------------------------------------------------------------
 // Python Backend
@@ -220,6 +222,71 @@ function createMainWindow() {
 }
 
 // ---------------------------------------------------------------------------
+// Companion Window (AI character floating)
+// ---------------------------------------------------------------------------
+
+function createCompanionWindow() {
+  const display = screen.getPrimaryDisplay();
+  const { width: screenW, height: screenH } = display.workAreaSize;
+
+  companionWindow = new BrowserWindow({
+    width: 300,
+    height: 400,
+    x: screenW - 340,
+    y: screenH - 440,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Load companion page
+  const companionURL = IS_DEV
+    ? `${BACKEND_URL}/companion.html`
+    : `file://${path.join(process.resourcesPath, "frontend-dist", "companion.html")}`;
+
+  companionWindow.loadURL(companionURL);
+  companionWindow.setVisibleOnAllWorkspaces(true);
+
+  companionWindow.on("closed", () => {
+    companionWindow = null;
+  });
+
+  console.log("[companion] Window created");
+}
+
+// ---------------------------------------------------------------------------
+// Companion IPC (window dragging)
+// ---------------------------------------------------------------------------
+
+function setupCompanionIPC() {
+  ipcMain.on("companion:drag-start", () => {
+    if (!companionWindow) return;
+    const [x, y] = companionWindow.getPosition();
+    companionDragStart = { winX: x, winY: y };
+  });
+
+  ipcMain.on("companion:drag-move", (_event, deltaX, deltaY) => {
+    if (!companionWindow || !companionDragStart) return;
+    companionWindow.setPosition(
+      companionDragStart.winX + deltaX,
+      companionDragStart.winY + deltaY,
+    );
+  });
+
+  ipcMain.on("companion:drag-end", () => {
+    companionDragStart = null;
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Tray
 // ---------------------------------------------------------------------------
 
@@ -248,6 +315,21 @@ function createTray() {
       label: "隐藏",
       click: () => {
         if (mainWindow) mainWindow.hide();
+      },
+    },
+    { type: "separator" },
+    {
+      label: "显示/隐藏 AI 伴侣",
+      click: () => {
+        if (companionWindow) {
+          if (companionWindow.isVisible()) {
+            companionWindow.hide();
+          } else {
+            companionWindow.show();
+          }
+        } else {
+          createCompanionWindow();
+        }
       },
     },
     { type: "separator" },
@@ -292,6 +374,8 @@ app.on("ready", async () => {
   }
 
   createMainWindow();
+  createCompanionWindow();
+  setupCompanionIPC();
   createTray();
 });
 

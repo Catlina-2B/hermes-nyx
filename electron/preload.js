@@ -6,7 +6,12 @@ contextBridge.exposeInMainWorld("hermesDesktop", {
   maximize: () => ipcRenderer.send("window:maximize"),
   close: () => ipcRenderer.send("window:close"),
 
-  // Companion controls (Phase 2+)
+  // Companion window dragging
+  moveCompanionWindowStart: () => ipcRenderer.send("companion:drag-start"),
+  moveCompanionWindow: (dx, dy) => ipcRenderer.send("companion:drag-move", dx, dy),
+  moveCompanionWindowEnd: () => ipcRenderer.send("companion:drag-end"),
+
+  // Companion messages (from main process)
   onCompanionMessage: (callback) => {
     ipcRenderer.on("companion:message", (_event, data) => callback(data));
   },
