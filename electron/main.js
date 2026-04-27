@@ -358,61 +358,62 @@ function setupCompanionIPC() {
 // ---------------------------------------------------------------------------
 
 async function captureScreen() {
-  try {
-    // Method 1: Try desktopCapturer (may work in some Electron versions)
-    const { desktopCapturer } = require("electron");
-    try {
-      const sources = await desktopCapturer.getSources({
-        types: ["screen"],
-        thumbnailSize: { width: 1280, height: 800 },
-      });
-      if (sources.length > 0) {
-        const pngBuffer = sources[0].thumbnail.toPNG();
-        if (pngBuffer.length > 1000) {
-          console.log(`[capture] desktopCapturer OK (${Math.round(pngBuffer.length / 1024)}KB)`);
-          return pngBuffer.toString("base64");
-        }
-      }
-    } catch (e) {
-      console.log("[capture] desktopCapturer failed, trying alternatives...");
-    }
-
-    // Method 2: Capture the main window content (doesn't need screen recording permission)
-    const win = mainWindow;
-    if (win) {
-      const image = await win.webContents.capturePage();
-      const pngBuffer = image.toPNG();
-      if (pngBuffer.length > 1000) {
-        console.log(`[capture] capturePage OK (${Math.round(pngBuffer.length / 1024)}KB)`);
-        return pngBuffer.toString("base64");
-      }
-    }
-
-    // Method 3: Try native screencapture command
-    try {
-      const { execSync } = require("child_process");
-      const os = require("os");
-      const fs = require("fs");
-      const tmpFile = path.join(os.tmpdir(), `hermes-capture-${Date.now()}.png`);
-      execSync(`/usr/sbin/screencapture -x -C "${tmpFile}"`, { timeout: 5000 });
-      if (fs.existsSync(tmpFile)) {
-        const pngBuffer = fs.readFileSync(tmpFile);
-        fs.unlinkSync(tmpFile);
-        if (pngBuffer.length > 1000) {
-          console.log(`[capture] screencapture OK (${Math.round(pngBuffer.length / 1024)}KB)`);
-          return pngBuffer.toString("base64");
-        }
-      }
-    } catch (e) {
-      console.log("[capture] screencapture failed:", e.message);
-    }
-
-    console.log("[capture] All capture methods failed");
-    return null;
-  } catch (err) {
-    console.error("[capture] Failed:", err.message);
+  // Use the main window's renderer process to capture via getDisplayMedia
+  // This is more reliable than desktopCapturer in Electron 35+
+  const win = mainWindow;
+  if (!win) {
+    console.log("[capture] No main window");
     return null;
   }
+
+  try {
+    const base64 = await win.webContents.executeJavaScript(`
+      (async () => {
+        try {
+          const stream = await navigator.mediaDevices.getDisplayMedia({
+            video: { width: 1280, height: 800 },
+            audio: false,
+          });
+          const track = stream.getVideoTracks()[0];
+          const imageCapture = new ImageCapture(track);
+          const bitmap = await imageCapture.grabFrame();
+          track.stop();
+
+          const canvas = document.createElement('canvas');
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(bitmap, 0, 0);
+          return canvas.toDataURL('image/png').split(',')[1];
+        } catch (e) {
+          // Fallback: capture just this window's content
+          return null;
+        }
+      })()
+    `);
+
+    if (base64 && base64.length > 1000) {
+      console.log(`[capture] getDisplayMedia OK (${Math.round(base64.length / 1024)}KB)`);
+      return base64;
+    }
+  } catch (e) {
+    console.log("[capture] getDisplayMedia failed:", e.message);
+  }
+
+  // Fallback: capture the app's own window
+  try {
+    const image = await win.webContents.capturePage();
+    const pngBuffer = image.toPNG();
+    if (pngBuffer.length > 1000) {
+      console.log(`[capture] capturePage fallback OK (${Math.round(pngBuffer.length / 1024)}KB)`);
+      return pngBuffer.toString("base64");
+    }
+  } catch (e) {
+    console.log("[capture] capturePage failed:", e.message);
+  }
+
+  console.log("[capture] All capture methods failed");
+  return null;
 }
 
 async function captureAndAnalyze() {
@@ -692,9 +693,20 @@ app.on("ready", async () => {
   console.log(`[app] Backend dir: ${BACKEND_DIR}`);
 
   // Clear cache to ensure fresh frontend assets are loaded
-  const { session } = require("electron");
+  const { session, desktopCapturer } = require("electron");
   await session.defaultSession.clearCache();
   console.log("[app] Cache cleared");
+
+  // Allow getDisplayMedia to work without system picker dialog
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    desktopCapturer.getSources({ types: ["screen"] }).then((sources) => {
+      if (sources.length > 0) {
+        callback({ video: sources[0] });
+      } else {
+        callback({});
+      }
+    }).catch(() => callback({}));
+  });
 
   // Set Dock icon (dev mode uses default Electron icon otherwise)
   if (process.platform === "darwin" && app.dock) {

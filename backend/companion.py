@@ -108,7 +108,7 @@ async def analyze_screenshot(image_base64: str, **_kwargs) -> dict:
                     }},
                 ],
             }],
-            max_tokens=150,
+            max_tokens=300,
         )
         text = resp.choices[0].message.content or ""
     except Exception as e:
