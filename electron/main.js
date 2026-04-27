@@ -319,6 +319,27 @@ function setupCompanionIPC() {
     await captureAndAnalyze();
   });
 
+  // Forward directives from any window to companion
+  ipcMain.on("companion:send-directive", (_event, directive) => {
+    if (companionWindow) {
+      companionWindow.webContents.send("companion:message", { directive });
+    }
+  });
+
+  // Avatar location switching: "desktop" or "webui"
+  ipcMain.on("avatar:switch", (_event, location) => {
+    console.log(`[avatar] Switching to: ${location}`);
+    if (location === "desktop") {
+      if (!companionWindow) createCompanionWindow();
+      else companionWindow.show();
+    } else if (location === "webui") {
+      if (companionWindow) companionWindow.hide();
+    }
+    // Notify all windows about the switch
+    if (mainWindow) mainWindow.webContents.send("avatar:switched", location);
+    if (companionWindow) companionWindow.webContents.send("avatar:switched", location);
+  });
+
   // Spotlight IPC
   ipcMain.on("spotlight:hide", () => {
     if (spotlightWindow) spotlightWindow.hide();

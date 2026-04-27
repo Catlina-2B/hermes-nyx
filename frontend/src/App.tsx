@@ -16,6 +16,8 @@ import type { ChatDirectiveHandler } from "./plugins/types";
 const AVATAR_W = 320;
 const AVATAR_H = 420;
 
+type AvatarLocation = "desktop" | "webui";
+
 function rectStyle(r: Rect): React.CSSProperties {
   return {
     position: "absolute",
@@ -26,6 +28,11 @@ function rectStyle(r: Rect): React.CSSProperties {
   };
 }
 
+/** Check if running inside Electron */
+function isElectron(): boolean {
+  return !!(window as any).hermesDesktop;
+}
+
 export default function App() {
   const chatDirectiveRef = useRef<ChatDirectiveHandler | null>(null);
   const chat = useChat(chatDirectiveRef);
@@ -34,6 +41,55 @@ export default function App() {
   const effectsRef = useRef<DragEffectsHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
+
+  // Avatar location: "desktop" (companion window) or "webui" (inline)
+  // Default to "desktop" in Electron, "webui" in browser
+  const [avatarLocation, setAvatarLocation] = useState<AvatarLocation>(
+    () => isElectron() ? "desktop" : "webui",
+  );
+
+  // Listen for avatar switch events from Electron
+  useEffect(() => {
+    const hd = (window as any).hermesDesktop;
+    if (!hd?.onAvatarSwitch) return;
+    hd.onAvatarSwitch((location: AvatarLocation) => {
+      setAvatarLocation(location);
+    });
+  }, []);
+
+  const showAvatarInWebUI = avatarLocation === "webui";
+
+  // Right-click context menu for switching avatar location
+  const onAvatarContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!isElectron()) return;
+    const target = avatarLocation === "webui" ? "desktop" : "webui";
+    const label = target === "desktop" ? "移至桌面悬浮" : "移至客户端内";
+    // Simple native-like context menu using a temporary div
+    const menu = document.createElement("div");
+    menu.className = "fixed z-[9999] py-1 px-0 rounded-lg border border-cyan-400/20 bg-[#0d1220]/95 backdrop-blur-xl shadow-[0_0_30px_rgba(34,211,238,0.12)] min-w-[140px]";
+    menu.style.left = `${e.clientX}px`;
+    menu.style.top = `${e.clientY}px`;
+
+    const item = document.createElement("button");
+    item.textContent = label;
+    item.className = "block w-full text-left px-4 py-2 text-xs font-mono text-cyan-200 hover:bg-cyan-400/10 transition-colors";
+    item.onclick = () => {
+      (window as any).hermesDesktop?.switchAvatarTo?.(target);
+      setAvatarLocation(target);
+      document.body.removeChild(menu);
+    };
+    menu.appendChild(item);
+
+    const dismiss = (ev: MouseEvent) => {
+      if (!menu.contains(ev.target as Node)) {
+        if (document.body.contains(menu)) document.body.removeChild(menu);
+        document.removeEventListener("mousedown", dismiss);
+      }
+    };
+    document.addEventListener("mousedown", dismiss);
+    document.body.appendChild(menu);
+  }, [avatarLocation]);
 
   // Container size tracking
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
@@ -48,7 +104,7 @@ export default function App() {
     return () => ro.disconnect();
   }, []);
 
-  // Default position: right side, vertically centered
+  // Default position: right side
   const defaultPos = useMemo(() => ({
     x: Math.max(0, window.innerWidth - AVATAR_W - 12),
     y: Math.max(0, (window.innerHeight - 40 - AVATAR_H) * 0.35),
@@ -74,17 +130,26 @@ export default function App() {
     defaultPos,
   );
 
-  // Compute fluid layout from avatar position
-  const layout = useMemo(
-    () => containerSize.w > 0
-      ? computeFluidLayout(
-          { x: pos.x, y: pos.y, w: AVATAR_W, h: AVATAR_H },
-          containerSize.w,
-          containerSize.h,
-        )
-      : null,
-    [pos.x, pos.y, containerSize.w, containerSize.h],
-  );
+  // Compute fluid layout — when avatar is on desktop, panels fill the full space
+  const layout = useMemo(() => {
+    if (containerSize.w <= 0) return null;
+    if (!showAvatarInWebUI) {
+      // No avatar in WebUI — give all space to panels
+      // Chat takes left ~75%, log+todo stack on the right
+      const sideW = 320;
+      const chatW = containerSize.w - sideW - 6;
+      return {
+        chat: { x: 0, y: 0, w: chatW, h: containerSize.h },
+        log:  { x: chatW + 6, y: 0, w: sideW, h: containerSize.h * 0.65 },
+        todo: { x: chatW + 6, y: containerSize.h * 0.65 + 6, w: sideW, h: containerSize.h * 0.35 - 6 },
+      };
+    }
+    return computeFluidLayout(
+      { x: pos.x, y: pos.y, w: AVATAR_W, h: AVATAR_H },
+      containerSize.w,
+      containerSize.h,
+    );
+  }, [pos.x, pos.y, containerSize.w, containerSize.h, showAvatarInWebUI]);
 
   const panelTransition = dragging
     ? "left 0.05s linear, top 0.05s linear, width 0.05s linear, height 0.05s linear"
@@ -141,30 +206,33 @@ export default function App() {
           </>
         )}
 
-        {/* Avatar panel — freely draggable */}
-        <div
-          ref={avatarRef}
-          className="absolute z-30 overflow-hidden rounded-lg border border-cyber-border"
-          style={{
-            left: pos.x,
-            top: pos.y,
-            width: AVATAR_W,
-            height: AVATAR_H,
-          }}
-        >
-          {/* Drag handle */}
+        {/* Avatar panel — only shown when in webui mode */}
+        {showAvatarInWebUI && (
           <div
-            onPointerDown={onPointerDown}
-            className="absolute inset-x-0 top-0 z-40 h-9 cursor-grab active:cursor-grabbing group select-none touch-none"
+            ref={avatarRef}
+            className="absolute z-30 overflow-hidden rounded-lg border border-cyber-border"
+            style={{
+              left: pos.x,
+              top: pos.y,
+              width: AVATAR_W,
+              height: AVATAR_H,
+            }}
+            onContextMenu={onAvatarContextMenu}
           >
-            <div className="absolute left-1/2 -translate-x-1/2 top-3 flex items-center gap-[3px] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              {Array.from({ length: 5 }, (_, i) => (
-                <span key={i} className="block w-[3px] h-[3px] rounded-full bg-cyan-300/60" />
-              ))}
+            {/* Drag handle */}
+            <div
+              onPointerDown={onPointerDown}
+              className="absolute inset-x-0 top-0 z-40 h-9 cursor-grab active:cursor-grabbing group select-none touch-none"
+            >
+              <div className="absolute left-1/2 -translate-x-1/2 top-3 flex items-center gap-[3px] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <span key={i} className="block w-[3px] h-[3px] rounded-full bg-cyan-300/60" />
+                ))}
+              </div>
             </div>
+            <DigitalHumanPanel expressionCallbackRef={chatDirectiveRef} />
           </div>
-          <DigitalHumanPanel expressionCallbackRef={chatDirectiveRef} />
-        </div>
+        )}
       </div>
 
       {/* Plugin overlays */}

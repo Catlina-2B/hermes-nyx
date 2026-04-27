@@ -14,8 +14,15 @@ contextBridge.exposeInMainWorld("hermesDesktop", {
   // Companion mode
   toggleCompanion: () => ipcRenderer.send("companion:toggle"),
   captureNow: () => ipcRenderer.send("companion:capture-now"),
+  sendToCompanion: (directive) => ipcRenderer.send("companion:send-directive", directive),
   onCompanionMessage: (callback) => {
     ipcRenderer.on("companion:message", (_event, data) => callback(data));
+  },
+
+  // Avatar location switching (desktop ↔ webui)
+  switchAvatarTo: (location) => ipcRenderer.send("avatar:switch", location),
+  onAvatarSwitch: (callback) => {
+    ipcRenderer.on("avatar:switched", (_event, location) => callback(location));
   },
 
   // Spotlight controls

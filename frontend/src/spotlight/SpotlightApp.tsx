@@ -78,7 +78,12 @@ export default function SpotlightApp() {
                 const data = JSON.parse(line.slice(6));
                 if (data.type === "chunk" && data.content) {
                   fullReply += data.content;
-                  setReply(parseChatDirectives(fullReply).text);
+                  const parsed = parseChatDirectives(fullReply);
+                  setReply(parsed.text);
+                  // Forward directives to companion window via IPC
+                  for (const dir of parsed.directives) {
+                    (window as any).hermesDesktop?.sendToCompanion?.(dir);
+                  }
                 }
               } catch { /* skip non-JSON lines */ }
             }

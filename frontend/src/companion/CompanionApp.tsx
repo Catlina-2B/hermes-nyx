@@ -60,8 +60,38 @@ export default function CompanionApp() {
     window.addEventListener("pointerup", onUp);
   }, []);
 
+  // Right-click to switch avatar to webui
+  const onContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const hd = (window as any).hermesDesktop;
+    if (!hd?.switchAvatarTo) return;
+
+    const menu = document.createElement("div");
+    menu.className = "fixed z-[9999] py-1 rounded-lg border border-cyan-400/20 bg-[#0d1220]/95 backdrop-blur-xl shadow-[0_0_30px_rgba(34,211,238,0.12)] min-w-[140px]";
+    menu.style.left = `${e.clientX}px`;
+    menu.style.top = `${e.clientY}px`;
+
+    const item = document.createElement("button");
+    item.textContent = "移至客户端内";
+    item.className = "block w-full text-left px-4 py-2 text-xs font-mono text-cyan-200 hover:bg-cyan-400/10 transition-colors";
+    item.onclick = () => {
+      hd.switchAvatarTo("webui");
+      document.body.removeChild(menu);
+    };
+    menu.appendChild(item);
+
+    const dismiss = (ev: MouseEvent) => {
+      if (!menu.contains(ev.target as Node)) {
+        if (document.body.contains(menu)) document.body.removeChild(menu);
+        document.removeEventListener("mousedown", dismiss);
+      }
+    };
+    document.addEventListener("mousedown", dismiss);
+    document.body.appendChild(menu);
+  }, []);
+
   return (
-    <div className="relative w-full h-full select-none">
+    <div className="relative w-full h-full select-none" onContextMenu={onContextMenu}>
       {/* Drag handle — entire window is draggable */}
       <div
         onPointerDown={onDragStart}
