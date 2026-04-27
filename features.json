@@ -74,7 +74,7 @@
             "加载独立的 companion 页面",
             "窗口背景完全透明"
           ],
-          "passes": false
+          "passes": true
         },
         {
           "id": "F006",
@@ -87,7 +87,7 @@
             "复用现有 VRM renderer 和 DigitalHumanPanel",
             "Build 后产出 companion.html + 对应 assets"
           ],
-          "passes": false
+          "passes": true
         },
         {
           "id": "F007",
@@ -99,7 +99,7 @@
             "拖拽边界限制在屏幕范围内",
             "位置持久化到 localStorage 或 electron-store"
           ],
-          "passes": false
+          "passes": true
         },
         {
           "id": "F008",
@@ -112,7 +112,7 @@
             "气泡位置跟随人物窗口",
             "支持简单 markdown 渲染"
           ],
-          "passes": false
+          "passes": true
         }
       ]
     },
