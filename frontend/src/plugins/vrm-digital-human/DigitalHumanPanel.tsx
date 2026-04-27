@@ -19,6 +19,8 @@ interface MotionBeat {
 interface Props {
   expressionCallbackRef: MutableRefObject<ExpressionCallback | null>;
   modelPath?: string;
+  /** Hide room background decorations (for transparent desktop companion) */
+  showRoom?: boolean;
 }
 
 const DEFAULT_POSE = "hands_behind";
@@ -40,6 +42,7 @@ const POSE_BONE_TARGET_KEYS = new Set([
 export default function DigitalHumanPanel({
   expressionCallbackRef,
   modelPath = "/models/yueyue.vrm",
+  showRoom = true,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -440,31 +443,35 @@ export default function DigitalHumanPanel({
   return (
     <section
       ref={containerRef}
-      className="relative h-full w-full overflow-hidden bg-[#101623]/88 select-none"
+      className={`relative h-full w-full overflow-hidden select-none ${showRoom ? "bg-[#101623]/88" : "bg-transparent"}`}
     >
-      <div className="pointer-events-none absolute inset-0 z-0">
-        <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,0.20),transparent_62%)]" />
-        <div className="absolute left-5 right-5 top-14 h-32 rounded-xl border border-cyan-200/12 bg-[#172033]/70 shadow-[inset_0_0_28px_rgba(34,211,238,0.08)]" />
-        <div className="absolute left-9 right-9 top-[74px] grid h-20 grid-cols-3 gap-2 opacity-70">
-          <span className="rounded-md bg-cyan-200/10" />
-          <span className="rounded-md bg-cyan-200/16" />
-          <span className="rounded-md bg-cyan-200/10" />
+      {showRoom && (
+        <div className="pointer-events-none absolute inset-0 z-0">
+          <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,0.20),transparent_62%)]" />
+          <div className="absolute left-5 right-5 top-14 h-32 rounded-xl border border-cyan-200/12 bg-[#172033]/70 shadow-[inset_0_0_28px_rgba(34,211,238,0.08)]" />
+          <div className="absolute left-9 right-9 top-[74px] grid h-20 grid-cols-3 gap-2 opacity-70">
+            <span className="rounded-md bg-cyan-200/10" />
+            <span className="rounded-md bg-cyan-200/16" />
+            <span className="rounded-md bg-cyan-200/10" />
+          </div>
+          <div className="absolute inset-x-0 bottom-0 h-40 bg-[linear-gradient(180deg,transparent,rgba(10,14,23,0.62)_34%,rgba(15,23,42,0.94))]" />
+          <div className="absolute left-8 right-8 bottom-11 h-20 rounded-[50%] bg-[radial-gradient(ellipse_at_center,rgba(103,232,249,0.42)_0%,rgba(34,211,238,0.22)_40%,transparent_72%)] blur-sm" />
+          <div className="absolute left-14 right-14 bottom-[58px] h-8 rounded-[50%] bg-cyan-100/28 blur-md" />
+          <div className="absolute left-10 right-10 bottom-[54px] h-10 rounded-[50%] bg-cyan-100/10 blur-xl" />
+          <div className="absolute left-6 right-6 bottom-6 h-px bg-cyan-200/28" />
         </div>
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-[linear-gradient(180deg,transparent,rgba(10,14,23,0.62)_34%,rgba(15,23,42,0.94))]" />
-        <div className="absolute left-8 right-8 bottom-11 h-20 rounded-[50%] bg-[radial-gradient(ellipse_at_center,rgba(103,232,249,0.42)_0%,rgba(34,211,238,0.22)_40%,transparent_72%)] blur-sm" />
-        <div className="absolute left-14 right-14 bottom-[58px] h-8 rounded-[50%] bg-cyan-100/28 blur-md" />
-        <div className="absolute left-10 right-10 bottom-[54px] h-10 rounded-[50%] bg-cyan-100/10 blur-xl" />
-        <div className="absolute left-6 right-6 bottom-6 h-px bg-cyan-200/28" />
-      </div>
+      )}
       <canvas ref={canvasRef} className="absolute inset-0 z-10 block h-full w-full bg-transparent" />
-      <div className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex h-7 items-center justify-between rounded-full border border-white/10 bg-black/20 px-3">
-        <div className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.8)]" />
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-300/80" />
-          <span className="h-1.5 w-1.5 rounded-full bg-amber-200/70" />
+      {showRoom && (
+        <div className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex h-7 items-center justify-between rounded-full border border-white/10 bg-black/20 px-3">
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.8)]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-300/80" />
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-200/70" />
+          </div>
+          <div className="h-px w-14 bg-cyan-200/25" />
         </div>
-        <div className="h-px w-14 bg-cyan-200/25" />
-      </div>
+      )}
       {loading && (
         <div className="absolute inset-0 z-30 flex items-center justify-center text-xs font-mono text-cyber-muted">
           loading vrm...

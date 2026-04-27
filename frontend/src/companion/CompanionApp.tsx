@@ -101,7 +101,7 @@ export default function CompanionApp() {
 
       {/* VRM Character */}
       <div className="absolute inset-0 z-10">
-        <DigitalHumanPanel expressionCallbackRef={chatDirectiveRef} />
+        <DigitalHumanPanel expressionCallbackRef={chatDirectiveRef} showRoom={false} />
       </div>
 
       {/* Speech Bubble */}
