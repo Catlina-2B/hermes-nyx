@@ -1,0 +1,223 @@
+{
+  "project": "Hermes Desktop Companion",
+  "description": "将 hermes-webui 打包为 macOS Electron 桌面应用，具备 AI 人物屏幕悬浮、实时陪伴、Spotlight 输入框",
+  "last_updated": "2026-04-27",
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "Electron Shell + Backend Spawning",
+      "features": [
+        {
+          "id": "F001",
+          "name": "Electron 项目脚手架",
+          "description": "在项目根目录创建 electron/ 目录，包含 main.js、preload.js、package.json，配置 electron-builder",
+          "steps": [
+            "创建 electron/package.json 含 electron + electron-builder 依赖",
+            "创建 electron/main.js 基础主进程（创建 BrowserWindow）",
+            "创建 electron/preload.js 预加载脚本",
+            "能通过 npm start 启动 Electron 并显示空白窗口"
+          ],
+          "passes": false
+        },
+        {
+          "id": "F002",
+          "name": "Python 后端生命周期管理",
+          "description": "Electron 启动时自动创建 venv、安装依赖、启动 uvicorn；退出时 kill 进程",
+          "steps": [
+            "检测系统 Python (python3)，创建 venv（如不存在）",
+            "自动 pip install -r requirements.txt",
+            "child_process.spawn 启动 uvicorn",
+            "轮询 /api/health 等待后端就绪",
+            "app quit 时 kill 后端子进程",
+            "处理后端崩溃重启"
+          ],
+          "passes": false
+        },
+        {
+          "id": "F003",
+          "name": "主 WebUI 窗口",
+          "description": "后端就绪后加载现有 hermes-webui 前端",
+          "steps": [
+            "Vite build 前端到 frontend/dist",
+            "FastAPI 提供静态文件服务",
+            "Electron BrowserWindow 加载 http://localhost:8081",
+            "显示加载界面直到前端就绪",
+            "窗口标题、图标、最小尺寸配置"
+          ],
+          "passes": false
+        },
+        {
+          "id": "F004",
+          "name": "系统托盘",
+          "description": "托盘图标 + 右键菜单（显示/隐藏主窗口、退出）",
+          "steps": [
+            "创建 Tray 图标",
+            "右键菜单：显示主窗口、隐藏、分割线、退出",
+            "点击托盘图标切换主窗口显示",
+            "关闭主窗口时最小化到托盘而非退出"
+          ],
+          "passes": false
+        }
+      ]
+    },
+    {
+      "id": "phase-2",
+      "name": "AI 人物悬浮窗",
+      "features": [
+        {
+          "id": "F005",
+          "name": "透明悬浮窗口",
+          "description": "创建透明、无边框、始终置顶的 BrowserWindow",
+          "steps": [
+            "BrowserWindow 配置：transparent, frame:false, alwaysOnTop, skipTaskbar",
+            "窗口大小约 300x400",
+            "加载独立的 companion 页面",
+            "窗口背景完全透明"
+          ],
+          "passes": false
+        },
+        {
+          "id": "F006",
+          "name": "Vite 多页面 + Companion 入口",
+          "description": "为悬浮窗创建独立的 Vite 入口页面，只渲染 VRM 人物",
+          "steps": [
+            "vite.config.ts 添加多页面入口 (companion.html)",
+            "创建 src/companion/CompanionApp.tsx 轻量入口",
+            "创建 src/companion/companion-entry.tsx",
+            "复用现有 VRM renderer 和 DigitalHumanPanel",
+            "Build 后产出 companion.html + 对应 assets"
+          ],
+          "passes": false
+        },
+        {
+          "id": "F007",
+          "name": "悬浮窗拖拽",
+          "description": "用户可拖拽 AI 人物到屏幕任意位置",
+          "steps": [
+            "pointer event 拖拽检测",
+            "通过 IPC 调用 mainWindow.setPosition 移动窗口",
+            "拖拽边界限制在屏幕范围内",
+            "位置持久化到 localStorage 或 electron-store"
+          ],
+          "passes": false
+        },
+        {
+          "id": "F008",
+          "name": "对话气泡",
+          "description": "AI 主动说话时在人物旁显示对话气泡",
+          "steps": [
+            "气泡 UI 组件（赛博朋克风格）",
+            "WebSocket 接收 AI 推送消息",
+            "气泡显示后 5 秒自动消失",
+            "气泡位置跟随人物窗口",
+            "支持简单 markdown 渲染"
+          ],
+          "passes": false
+        }
+      ]
+    },
+    {
+      "id": "phase-3",
+      "name": "Spotlight 输入框",
+      "features": [
+        {
+          "id": "F009",
+          "name": "全局快捷键",
+          "description": "Cmd+Shift+H 注册全局快捷键",
+          "steps": [
+            "globalShortcut.register('CommandOrControl+Shift+H', callback)",
+            "快捷键切换输入框窗口显示/隐藏",
+            "app 失焦时不影响快捷键"
+          ],
+          "passes": false
+        },
+        {
+          "id": "F010",
+          "name": "Spotlight 窗口",
+          "description": "透明无边框居中输入框窗口",
+          "steps": [
+            "BrowserWindow: transparent, frame:false, width:600, height:60",
+            "居中显示在屏幕上方 1/3 位置",
+            "加载独立的 spotlight 页面",
+            "ESC 或失焦时隐藏",
+            "显示时自动聚焦输入框"
+          ],
+          "passes": false
+        },
+        {
+          "id": "F011",
+          "name": "Spotlight UI",
+          "description": "毛玻璃 + 赛博朋克风格输入框 UI",
+          "steps": [
+            "Vite 多页面入口 (spotlight.html)",
+            "输入框组件：毛玻璃背景、圆角、图标",
+            "回车发送消息到 /api/chat",
+            "AI 回复时窗口向下展开显示回复",
+            "回复区域支持 markdown",
+            "发送的消息同步到主窗口聊天历史"
+          ],
+          "passes": false
+        }
+      ]
+    },
+    {
+      "id": "phase-4",
+      "name": "实时陪伴（截屏 + AI 分析）",
+      "features": [
+        {
+          "id": "F012",
+          "name": "屏幕截图服务",
+          "description": "Electron main process 使用 desktopCapturer 截屏",
+          "steps": [
+            "请求 macOS Screen Recording 权限",
+            "desktopCapturer.getSources 获取屏幕",
+            "截图缩放到 1280px 宽",
+            "转为 base64 PNG",
+            "权限被拒绝时友好提示"
+          ],
+          "passes": false
+        },
+        {
+          "id": "F013",
+          "name": "后端截图分析 API",
+          "description": "POST /api/companion/analyze 接收截图并调用 vision model",
+          "steps": [
+            "新增 backend/companion.py 模块",
+            "POST /api/companion/analyze 接收 base64 图片",
+            "调用 vision model (OpenAI gpt-4o) 分析截图内容",
+            "Prompt: 描述用户在做什么，判断是否需要主动交流",
+            "返回分析结果 + 是否主动说话 + 说话内容"
+          ],
+          "passes": false
+        },
+        {
+          "id": "F014",
+          "name": "定时截屏循环",
+          "description": "开启陪伴模式后定时截屏并分析",
+          "steps": [
+            "AI 人物右键菜单：开启/关闭实时陪伴",
+            "可配置间隔（默认 5 分钟）",
+            "定时器触发截屏 → 发送到后端 → 接收分析结果",
+            "AI 决定主动说话时推送到悬浮窗气泡",
+            "用户快捷键 Cmd+Shift+S 立即截屏分析"
+          ],
+          "passes": false
+        },
+        {
+          "id": "F015",
+          "name": "macOS .app 打包",
+          "description": "使用 electron-builder 打包为 Hermes.app",
+          "steps": [
+            "electron-builder 配置 (mac target: dmg + dir)",
+            "打包 backend/ 源码 + requirements.txt + models/",
+            "Info.plist 声明 Screen Recording 权限 (NSScreenCaptureUsageDescription)",
+            "应用图标 (.icns)",
+            "签名配置（开发阶段可跳过）",
+            "测试 .app 能正常启动和运行"
+          ],
+          "passes": false
+        }
+      ]
+    }
+  ]
+}
