@@ -358,7 +358,23 @@ function setupCompanionIPC() {
 // ---------------------------------------------------------------------------
 
 async function captureScreen() {
-  const { desktopCapturer } = require("electron");
+  const { desktopCapturer, systemPreferences, dialog } = require("electron");
+
+  // Check screen recording permission on macOS
+  if (process.platform === "darwin") {
+    const status = systemPreferences.getMediaAccessStatus("screen");
+    console.log(`[capture] Screen recording permission: ${status}`);
+    if (status !== "granted") {
+      dialog.showMessageBox({
+        type: "warning",
+        title: "需要屏幕录制权限",
+        message: "请在「系统设置 → 隐私与安全性 → 屏幕录制」中允许 Hermes 录制屏幕，然后重试。",
+        buttons: ["好"],
+      });
+      return null;
+    }
+  }
+
   try {
     const sources = await desktopCapturer.getSources({
       types: ["screen"],
@@ -372,6 +388,12 @@ async function captureScreen() {
 
     const thumbnail = sources[0].thumbnail;
     const pngBuffer = thumbnail.toPNG();
+
+    if (pngBuffer.length < 1000) {
+      console.log("[capture] Screenshot too small — likely no permission");
+      return null;
+    }
+
     const base64 = pngBuffer.toString("base64");
     console.log(`[capture] Screenshot captured (${Math.round(pngBuffer.length / 1024)}KB)`);
     return base64;
@@ -401,12 +423,19 @@ async function captureAndAnalyze() {
     console.log(`[companion] Activity: ${result.activity}`);
     console.log(`[companion] Should speak: ${result.should_speak}`);
 
-    if (result.should_speak && result.message && companionWindow) {
-      companionWindow.webContents.send("companion:message", {
-        text: result.message,
-        directive: result.mood ? { pose: result.mood } : undefined,
-      });
-      console.log(`[companion] Sent message: ${result.message}`);
+    if (companionWindow) {
+      if (result.should_speak && result.message) {
+        companionWindow.webContents.send("companion:message", {
+          text: result.message,
+          directive: result.mood ? { pose: result.mood } : undefined,
+        });
+        console.log(`[companion] Sent message: ${result.message}`);
+      } else {
+        // Brief activity indicator even when not speaking
+        companionWindow.webContents.send("companion:message", {
+          text: `👀 ${result.activity}`,
+        });
+      }
     }
   } catch (err) {
     console.error("[companion] Analysis error:", err.message);
