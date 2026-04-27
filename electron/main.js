@@ -358,22 +358,7 @@ function setupCompanionIPC() {
 // ---------------------------------------------------------------------------
 
 async function captureScreen() {
-  const { desktopCapturer, systemPreferences, dialog } = require("electron");
-
-  // Check screen recording permission on macOS
-  if (process.platform === "darwin") {
-    const status = systemPreferences.getMediaAccessStatus("screen");
-    console.log(`[capture] Screen recording permission: ${status}`);
-    if (status !== "granted") {
-      dialog.showMessageBox({
-        type: "warning",
-        title: "需要屏幕录制权限",
-        message: "请在「系统设置 → 隐私与安全性 → 屏幕录制」中允许 Hermes 录制屏幕，然后重试。",
-        buttons: ["好"],
-      });
-      return null;
-    }
-  }
+  const { desktopCapturer, dialog } = require("electron");
 
   try {
     const sources = await desktopCapturer.getSources({
@@ -383,17 +368,17 @@ async function captureScreen() {
 
     if (sources.length === 0) {
       console.log("[capture] No screen sources available");
+      dialog.showMessageBox({
+        type: "warning",
+        title: "截屏失败",
+        message: "请在「系统设置 → 隐私与安全性 → 屏幕录制」中允许本应用录制屏幕，授权后需重启应用。",
+        buttons: ["好"],
+      });
       return null;
     }
 
     const thumbnail = sources[0].thumbnail;
     const pngBuffer = thumbnail.toPNG();
-
-    if (pngBuffer.length < 1000) {
-      console.log("[capture] Screenshot too small — likely no permission");
-      return null;
-    }
-
     const base64 = pngBuffer.toString("base64");
     console.log(`[capture] Screenshot captured (${Math.round(pngBuffer.length / 1024)}KB)`);
     return base64;
