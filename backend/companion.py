@@ -1,84 +1,100 @@
 """
-Companion module: screenshot analysis via the same Hermes agent.
-Sends screenshot description through the regular chat pipeline.
+Companion module: screenshot analysis.
+Reads API credentials from ~/.hermes/.env (same as Hermes agent).
 """
 
-ANALYSIS_PROMPT = """[系统指令] 你正在实时陪伴模式下工作。用户的屏幕截图已发送给你。
-请分析截图内容，用JSON格式回复：
-{"activity": "用户在做什么（简短描述）", "should_speak": true/false, "message": "要说的话（如果should_speak为true）", "mood": "neutral|happy|curious|concerned"}
+import os
+import json
+from pathlib import Path
+
+# Load ~/.hermes/.env so we use the same API key as Hermes
+_env_path = Path.home() / ".hermes" / ".env"
+if _env_path.exists():
+    with open(_env_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, val = line.partition("=")
+                os.environ.setdefault(key.strip(), val.strip())
+
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
+
+ANALYSIS_PROMPT = """你是 Hermes，一个 AI 桌面伴侣。你可以看到用户的屏幕截图。
+
+分析截图内容，用 JSON 格式回复：
+{"activity": "用户在做什么", "should_speak": true/false, "message": "要说的话", "mood": "neutral|happy|curious|concerned"}
 
 规则：
-- 如果用户在专注工作（编程、写作、阅读），不要打扰，should_speak设为false
-- 如果用户看起来需要帮助、在闲逛、或你有有趣的话要说，should_speak设为true
-- message要简短友好（1-2句话）
-- 用中文回复"""
+- 专注工作（编程、写作）时不打扰，should_speak 设为 false
+- 用户闲逛、需要帮助、或你有有趣的话时，should_speak 设为 true
+- message 简短友好（1-2句），用中文"""
 
 
-async def analyze_screenshot(image_base64: str, chat_manager=None) -> dict:
-    """
-    Analyze screenshot by sending it through the Hermes chat as a companion message.
-    Falls back to a simple description if chat_manager is not available.
-    """
-    import json
-
-    if not chat_manager:
-        return {
-            "activity": "Chat manager not available",
-            "should_speak": False,
-            "message": "",
-            "mood": "neutral",
-        }
-
-    # Send as a chat message with image context
-    prompt = f"{ANALYSIS_PROMPT}\n\n[截图已捕获，base64长度: {len(image_base64)} 字符]"
-
-    full_response = ""
+def _get_model():
     try:
-        async for event in chat_manager.send_message(prompt):
-            if event.get("type") == "chunk":
-                full_response += event.get("content", "")
-            elif event.get("type") == "done":
-                if not full_response:
-                    full_response = event.get("final_response", "")
+        from config import load_hermes_config
+        raw = load_hermes_config().get("model", {})
+        if isinstance(raw, dict):
+            return raw.get("default", "gpt-4o")
+        return raw or "gpt-4o"
+    except Exception:
+        return "gpt-4o"
+
+
+async def analyze_screenshot(image_base64: str, **_kwargs) -> dict:
+    if not OpenAI:
+        return _err("openai package not installed")
+
+    api_key = os.environ.get("OPENAI_API_KEY")
+    base_url = os.environ.get("OPENAI_BASE_URL")
+    if not api_key:
+        return _err("No OPENAI_API_KEY in ~/.hermes/.env")
+
+    client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+    model = _get_model()
+
+    try:
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": ANALYSIS_PROMPT},
+                    {"type": "image_url", "image_url": {
+                        "url": f"data:image/png;base64,{image_base64}",
+                        "detail": "low",
+                    }},
+                ],
+            }],
+            max_tokens=300,
+        )
+        text = resp.choices[0].message.content or ""
     except Exception as e:
-        return {
-            "activity": f"Analysis failed: {str(e)}",
-            "should_speak": False,
-            "message": "",
-            "mood": "neutral",
-            "error": str(e),
-        }
+        return _err(str(e))
 
-    # Try to parse JSON from response
+    # Parse JSON from response
     try:
-        # Find JSON in the response (might be wrapped in markdown)
-        json_str = full_response
-        if "```" in json_str:
-            parts = json_str.split("```")
-            for part in parts:
-                part = part.strip()
-                if part.startswith("json"):
-                    part = part[4:].strip()
-                if part.startswith("{"):
-                    json_str = part
-                    break
-        elif "{" in json_str:
-            start = json_str.index("{")
-            end = json_str.rindex("}") + 1
-            json_str = json_str[start:end]
-
-        result = json.loads(json_str)
+        j = text
+        if "{" in j:
+            j = j[j.index("{"):j.rindex("}") + 1]
+        r = json.loads(j)
         return {
-            "activity": result.get("activity", "Unknown"),
-            "should_speak": result.get("should_speak", False),
-            "message": result.get("message", ""),
-            "mood": result.get("mood", "neutral"),
+            "activity": r.get("activity", "Unknown"),
+            "should_speak": r.get("should_speak", False),
+            "message": r.get("message", ""),
+            "mood": r.get("mood", "neutral"),
         }
     except (json.JSONDecodeError, ValueError):
-        # Couldn't parse JSON — treat the whole response as a spoken message
         return {
-            "activity": full_response[:100] if full_response else "Unknown",
-            "should_speak": bool(full_response),
-            "message": full_response[:200] if full_response else "",
+            "activity": text[:100] or "Unknown",
+            "should_speak": bool(text),
+            "message": text[:200],
             "mood": "neutral",
         }
+
+
+def _err(msg):
+    return {"activity": msg, "should_speak": False, "message": "", "mood": "neutral", "error": msg}
