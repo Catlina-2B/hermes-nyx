@@ -43,10 +43,23 @@ export default function App() {
   const avatarRef = useRef<HTMLDivElement>(null);
 
   // Avatar location: "desktop" (companion window) or "webui" (inline)
-  // Default to "desktop" in Electron, "webui" in browser
-  const [avatarLocation, setAvatarLocation] = useState<AvatarLocation>(
-    () => isElectron() ? "desktop" : "webui",
-  );
+  // Persisted to localStorage so it survives page refresh
+  const [avatarLocation, setAvatarLocation] = useState<AvatarLocation>(() => {
+    try {
+      const saved = localStorage.getItem("hermes-avatar-location");
+      if (saved === "desktop" || saved === "webui") return saved;
+    } catch { /* noop */ }
+    return isElectron() ? "desktop" : "webui";
+  });
+
+  // Persist and sync with Electron on change
+  useEffect(() => {
+    try { localStorage.setItem("hermes-avatar-location", avatarLocation); } catch { /* noop */ }
+    // Tell Electron to show/hide companion window
+    if (isElectron()) {
+      (window as any).hermesDesktop?.switchAvatarTo?.(avatarLocation);
+    }
+  }, [avatarLocation]);
 
   // Listen for avatar switch events from Electron
   useEffect(() => {
