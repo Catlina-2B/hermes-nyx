@@ -120,7 +120,7 @@ export default function App() {
   // Default position: right side
   const defaultPos = useMemo(() => ({
     x: Math.max(0, window.innerWidth - AVATAR_W - 12),
-    y: Math.max(0, (window.innerHeight - 40 - AVATAR_H) * 0.35),
+    y: Math.max(0, (window.innerHeight - 48 - AVATAR_H) * 0.35),
   }), []);
 
   const getAvatarRect = useCallback((): DOMRect | null => {
