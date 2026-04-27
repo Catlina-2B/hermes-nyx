@@ -514,11 +514,8 @@ function registerGlobalShortcuts() {
 // ---------------------------------------------------------------------------
 
 function createTray() {
-  // Use a simple template image for the tray
-  const icon = nativeImage.createFromDataURL(
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAWElEQVQ4T2NkoBAwUqifgWoG" +
-    "/P//n+HVq1cMjIyMDAwMDAzIYsQ6HtkAZMNwuQLdAGTDCbqCbAOQXUFNG0A2ENsVRBuA7Api" +
-    "w4VoA4h1BdEGEOsKYsMFABWINxF/8YO6AAAAAElFTkSuQmCC"
+  const icon = nativeImage.createFromPath(
+    path.join(__dirname, "icons", "trayTemplate.png"),
   );
 
   tray = new Tray(icon);

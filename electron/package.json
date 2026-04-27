@@ -18,6 +18,7 @@
     "appId": "com.hermes.desktop",
     "productName": "Hermes",
     "mac": {
+      "icon": "icons/icon.icns",
       "category": "public.app-category.productivity",
       "target": ["dmg", "dir"],
       "extendInfo": {
