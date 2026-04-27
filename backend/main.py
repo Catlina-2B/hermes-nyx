@@ -244,7 +244,7 @@ async def ws_logs(ws: WebSocket):
 
 # ── Companion API ────────────────────────────────────────
 
-from companion import analyze_screenshot
+from companion import analyze_screenshot, get_analysis_history
 
 
 class ScreenshotRequest(BaseModel):
@@ -276,6 +276,11 @@ async def companion_toggle():
     global _companion_enabled
     _companion_enabled = not _companion_enabled
     return {"enabled": _companion_enabled}
+
+
+@app.get("/api/companion/history")
+async def companion_history():
+    return get_analysis_history()
 
 
 @app.post("/api/companion/interval")

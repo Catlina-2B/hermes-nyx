@@ -8,6 +8,7 @@ import SystemBar from "./components/SystemBar";
 import ChatPanel from "./components/ChatPanel";
 import LogPanel from "./components/LogPanel";
 import TodoPanel from "./components/TodoPanel";
+import CompanionPanel from "./components/CompanionPanel";
 import DragEffectsCanvas, { type DragEffectsHandle } from "./components/DragEffectsCanvas";
 import DigitalHumanPanel from "./plugins/vrm-digital-human/DigitalHumanPanel";
 import { frontendPlugins } from "./plugins/registry";
@@ -151,33 +152,45 @@ export default function App() {
     const g = 6; // gap
 
     if (!showAvatarInWebUI) {
-      // No avatar — responsive layout for chat + log + todo
+      // No avatar — responsive layout: chat + sidebar (log, companion, todo)
       if (cw < 640) {
-        // Narrow: stack vertically (chat top, log+todo bottom)
         const chatH = ch * 0.6;
         const sideH = ch - chatH - g;
         return {
-          chat: { x: 0, y: 0, w: cw, h: chatH },
-          log:  { x: 0, y: chatH + g, w: cw * 0.6 - g / 2, h: sideH },
-          todo: { x: cw * 0.6 + g / 2, y: chatH + g, w: cw * 0.4 - g / 2, h: sideH },
+          chat:      { x: 0, y: 0, w: cw, h: chatH },
+          log:       { x: 0, y: chatH + g, w: cw * 0.5 - g / 2, h: sideH },
+          companion: { x: cw * 0.5 + g / 2, y: chatH + g, w: cw * 0.5 - g / 2, h: sideH * 0.6 },
+          todo:      { x: cw * 0.5 + g / 2, y: chatH + g + sideH * 0.6 + g, w: cw * 0.5 - g / 2, h: sideH * 0.4 - g },
         };
       }
-      // Normal: chat left, sidebar right (proportional width)
       const sideW = Math.min(320, Math.max(200, cw * 0.25));
       const chatW = cw - sideW - g;
       return {
-        chat: { x: 0, y: 0, w: chatW, h: ch },
-        log:  { x: chatW + g, y: 0, w: sideW, h: ch * 0.65 },
-        todo: { x: chatW + g, y: ch * 0.65 + g, w: sideW, h: ch * 0.35 - g },
+        chat:      { x: 0, y: 0, w: chatW, h: ch },
+        log:       { x: chatW + g, y: 0, w: sideW, h: ch * 0.35 },
+        companion: { x: chatW + g, y: ch * 0.35 + g, w: sideW, h: ch * 0.4 - g },
+        todo:      { x: chatW + g, y: ch * 0.75 + g, w: sideW, h: ch * 0.25 - g },
       };
     }
 
-    // Avatar in webui — fluid layout
-    return computeFluidLayout(
+    // Avatar in webui — fluid layout + companion shares log space
+    const base = computeFluidLayout(
       { x: pos.x, y: pos.y, w: AVATAR_W, h: AVATAR_H },
       cw,
       ch,
     );
+    // Split log area: top half log, bottom half companion
+    const logH = Math.floor(base.log.h * 0.5);
+    return {
+      ...base,
+      log: { ...base.log, h: logH },
+      companion: {
+        x: base.log.x,
+        y: base.log.y + logH + g,
+        w: base.log.w,
+        h: base.log.h - logH - g,
+      },
+    };
   }, [pos.x, pos.y, containerSize.w, containerSize.h, showAvatarInWebUI]);
 
   const panelTransition = dragging
@@ -232,6 +245,16 @@ export default function App() {
                 onRemove={remove}
               />
             </div>
+
+            {/* Companion analysis panel */}
+            {layout.companion && (
+              <div
+                className="absolute overflow-hidden rounded-lg border border-cyber-border bg-cyber-panel"
+                style={{ ...rectStyle(layout.companion), transition: panelTransition }}
+              >
+                <CompanionPanel />
+              </div>
+            )}
           </>
         )}
 
