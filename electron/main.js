@@ -358,29 +358,37 @@ function setupCompanionIPC() {
 // ---------------------------------------------------------------------------
 
 async function captureScreen() {
-  const { desktopCapturer, dialog } = require("electron");
-
   try {
-    const sources = await desktopCapturer.getSources({
-      types: ["screen"],
-      thumbnailSize: { width: 1280, height: 800 },
-    });
+    // Use BrowserWindow-based screen capture (works in Electron 35+)
+    // Create a hidden window, capture its screen via webContents
+    const displays = screen.getAllDisplays();
+    const primaryDisplay = displays[0];
+    const { width, height } = primaryDisplay.size;
 
-    if (sources.length === 0) {
-      console.log("[capture] No screen sources available");
-      dialog.showMessageBox({
-        type: "warning",
-        title: "截屏失败",
-        message: "请在「系统设置 → 隐私与安全性 → 屏幕录制」中允许本应用录制屏幕，授权后需重启应用。",
-        buttons: ["好"],
-      });
+    // Use the main window to capture the screen
+    const win = mainWindow || companionWindow;
+    if (!win) {
+      console.log("[capture] No window available for capture");
       return null;
     }
 
-    const thumbnail = sources[0].thumbnail;
-    const pngBuffer = thumbnail.toPNG();
+    // Take screenshot using exec + screencapture (macOS native, most reliable)
+    const { execSync } = require("child_process");
+    const tmpFile = path.join(require("os").tmpdir(), `hermes-capture-${Date.now()}.png`);
+
+    execSync(`screencapture -x -C ${tmpFile}`, { timeout: 5000 });
+
+    const fs = require("fs");
+    if (!fs.existsSync(tmpFile)) {
+      console.log("[capture] screencapture produced no file");
+      return null;
+    }
+
+    const pngBuffer = fs.readFileSync(tmpFile);
+    fs.unlinkSync(tmpFile);
+
     const base64 = pngBuffer.toString("base64");
-    console.log(`[capture] Screenshot captured (${Math.round(pngBuffer.length / 1024)}KB)`);
+    console.log(`[capture] Screenshot captured via screencapture (${Math.round(pngBuffer.length / 1024)}KB)`);
     return base64;
   } catch (err) {
     console.error("[capture] Failed:", err.message);
