@@ -73,6 +73,15 @@ export default function App() {
 
   const showAvatarInWebUI = avatarLocation === "webui";
 
+  // When avatar is on desktop, forward chat directives to companion window via IPC
+  useEffect(() => {
+    if (showAvatarInWebUI) return; // DigitalHumanPanel handles it directly
+    chatDirectiveRef.current = (directive) => {
+      (window as any).hermesDesktop?.sendToCompanion?.(directive);
+    };
+    return () => { chatDirectiveRef.current = null; };
+  }, [showAvatarInWebUI]);
+
   // Right-click context menu for switching avatar location
   const onAvatarContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
