@@ -206,14 +206,14 @@ After editing backend prompt code, restart the backend. Existing agent instances
 Frontend build:
 
 ```bash
-cd /Users/liu/test/hermes-webui/frontend
+cd ./frontend
 npm run build
 ```
 
 Backend syntax check:
 
 ```bash
-cd /Users/liu/test/hermes-webui
+cd .
 python3 -m py_compile backend/chat_manager.py backend/plugins/vrm_digital_human.py backend/main.py
 ```
 

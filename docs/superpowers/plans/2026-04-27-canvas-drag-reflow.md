@@ -34,7 +34,7 @@
 - [ ] **Step 1: Install the package**
 
 ```bash
-cd /Users/liu/test/hermes-webui/frontend
+cd ./frontend
 npm install react-grid-layout
 npm install -D @types/react-grid-layout
 ```
@@ -42,7 +42,7 @@ npm install -D @types/react-grid-layout
 - [ ] **Step 2: Verify installation**
 
 ```bash
-cd /Users/liu/test/hermes-webui/frontend
+cd ./frontend
 npx tsc --noEmit
 ```
 
@@ -51,7 +51,7 @@ Expected: no errors
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/liu/test/hermes-webui
+cd .
 git add frontend/package.json frontend/package-lock.json
 git commit -m "chore: add react-grid-layout dependency"
 ```
@@ -151,7 +151,7 @@ export function useGridLayout() {
 - [ ] **Step 2: Type-check**
 
 ```bash
-cd /Users/liu/test/hermes-webui/frontend && npx tsc --noEmit
+cd ./frontend && npx tsc --noEmit
 ```
 
 Expected: no errors
@@ -159,7 +159,7 @@ Expected: no errors
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/liu/test/hermes-webui
+cd .
 git add frontend/src/hooks/useGridLayout.ts
 git commit -m "feat: add useGridLayout hook for grid state management"
 ```
@@ -305,7 +305,7 @@ export default function DashboardGrid({
 - [ ] **Step 3: Type-check**
 
 ```bash
-cd /Users/liu/test/hermes-webui/frontend && npx tsc --noEmit
+cd ./frontend && npx tsc --noEmit
 ```
 
 Expected: no errors
@@ -313,7 +313,7 @@ Expected: no errors
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/liu/test/hermes-webui
+cd .
 git add frontend/src/components/DashboardGrid.tsx frontend/src/styles/global.css
 git commit -m "feat: add DashboardGrid component with cyberpunk-styled grid layout"
 ```
@@ -440,7 +440,7 @@ export default function App() {
 - [ ] **Step 2: Type-check and build**
 
 ```bash
-cd /Users/liu/test/hermes-webui/frontend && npx tsc --noEmit && npx vite build
+cd ./frontend && npx tsc --noEmit && npx vite build
 ```
 
 Expected: both pass
@@ -448,7 +448,7 @@ Expected: both pass
 - [ ] **Step 3: Manual verification**
 
 ```bash
-cd /Users/liu/test/hermes-webui/frontend && npx vite --open
+cd ./frontend && npx vite --open
 ```
 
 Verify:
@@ -461,7 +461,7 @@ Verify:
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/liu/test/hermes-webui
+cd .
 git add frontend/src/App.tsx
 git commit -m "feat: replace flex/dock layout with react-grid-layout dashboard"
 ```
@@ -811,7 +811,7 @@ export class DragEffectsEngine {
 - [ ] **Step 2: Type-check**
 
 ```bash
-cd /Users/liu/test/hermes-webui/frontend && npx tsc --noEmit
+cd ./frontend && npx tsc --noEmit
 ```
 
 Expected: no errors
@@ -819,7 +819,7 @@ Expected: no errors
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/liu/test/hermes-webui
+cd .
 git add frontend/src/lib/drag-effects.ts
 git commit -m "feat: add Canvas particle engine for drag effects"
 ```
@@ -899,7 +899,7 @@ export default forwardRef<DragEffectsHandle>(function DragEffectsCanvas(_props, 
 - [ ] **Step 2: Type-check**
 
 ```bash
-cd /Users/liu/test/hermes-webui/frontend && npx tsc --noEmit
+cd ./frontend && npx tsc --noEmit
 ```
 
 Expected: no errors
@@ -907,7 +907,7 @@ Expected: no errors
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/liu/test/hermes-webui
+cd .
 git add frontend/src/components/DragEffectsCanvas.tsx
 git commit -m "feat: add DragEffectsCanvas overlay component"
 ```
@@ -973,7 +973,7 @@ The full return JSX becomes:
 - [ ] **Step 2: Type-check and build**
 
 ```bash
-cd /Users/liu/test/hermes-webui/frontend && npx tsc --noEmit && npx vite build
+cd ./frontend && npx tsc --noEmit && npx vite build
 ```
 
 Expected: both pass
@@ -981,7 +981,7 @@ Expected: both pass
 - [ ] **Step 3: Manual verification**
 
 ```bash
-cd /Users/liu/test/hermes-webui/frontend && npx vite --open
+cd ./frontend && npx vite --open
 ```
 
 Verify:
@@ -996,7 +996,7 @@ Verify:
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/liu/test/hermes-webui
+cd .
 git add frontend/src/App.tsx
 git commit -m "feat: connect drag events to Canvas effects layer"
 ```
@@ -1013,7 +1013,7 @@ git commit -m "feat: connect drag events to Canvas effects layer"
 - [ ] **Step 1: Remove old files**
 
 ```bash
-cd /Users/liu/test/hermes-webui/frontend
+cd ./frontend
 rm src/hooks/useDock.ts src/components/DropZone.tsx
 ```
 
@@ -1034,7 +1034,7 @@ export const vrmDigitalHumanPlugin: HermesFrontendPlugin = {
 - [ ] **Step 3: Type-check and build**
 
 ```bash
-cd /Users/liu/test/hermes-webui/frontend && npx tsc --noEmit && npx vite build
+cd ./frontend && npx tsc --noEmit && npx vite build
 ```
 
 Expected: both pass, no unused import warnings
@@ -1042,7 +1042,7 @@ Expected: both pass, no unused import warnings
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/liu/test/hermes-webui
+cd .
 git add -A
 git commit -m "refactor: remove old dock system, replaced by grid layout"
 ```
