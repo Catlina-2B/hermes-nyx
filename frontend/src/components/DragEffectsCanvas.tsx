@@ -1,6 +1,12 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import { DragEffectsEngine } from "../lib/drag-effects";
-import type { DragEvent } from "./DashboardGrid";
+
+export interface DragEvent {
+  type: "start" | "move" | "stop";
+  mouseX: number;
+  mouseY: number;
+  panelRect: DOMRect | null;
+}
 
 export interface DragEffectsHandle {
   onDragEvent: (event: DragEvent) => void;
