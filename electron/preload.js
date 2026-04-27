@@ -11,7 +11,9 @@ contextBridge.exposeInMainWorld("hermesDesktop", {
   moveCompanionWindow: (dx, dy) => ipcRenderer.send("companion:drag-move", dx, dy),
   moveCompanionWindowEnd: () => ipcRenderer.send("companion:drag-end"),
 
-  // Companion messages (from main process)
+  // Companion mode
+  toggleCompanion: () => ipcRenderer.send("companion:toggle"),
+  captureNow: () => ipcRenderer.send("companion:capture-now"),
   onCompanionMessage: (callback) => {
     ipcRenderer.on("companion:message", (_event, data) => callback(data));
   },

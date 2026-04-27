@@ -38,6 +38,9 @@ let tray = null;
 let backendProcess = null;
 let isQuitting = false;
 let companionDragStart = null; // { winX, winY } at drag start
+let companionTimerId = null;
+let companionEnabled = false;
+let companionIntervalMs = 5 * 60 * 1000; // 5 minutes default
 
 // ---------------------------------------------------------------------------
 // Python Backend
@@ -300,6 +303,22 @@ function setupCompanionIPC() {
     companionDragStart = null;
   });
 
+  // Companion mode IPC
+  ipcMain.on("companion:toggle", async () => {
+    companionEnabled = !companionEnabled;
+    console.log(`[companion] Mode ${companionEnabled ? "enabled" : "disabled"}`);
+    if (companionEnabled) {
+      startCompanionLoop();
+    } else {
+      stopCompanionLoop();
+    }
+  });
+
+  ipcMain.on("companion:capture-now", async () => {
+    console.log("[companion] Manual capture requested");
+    await captureAndAnalyze();
+  });
+
   // Spotlight IPC
   ipcMain.on("spotlight:hide", () => {
     if (spotlightWindow) spotlightWindow.hide();
@@ -310,6 +329,82 @@ function setupCompanionIPC() {
       spotlightWindow.setSize(600, 420);
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Screen Capture + Companion Loop
+// ---------------------------------------------------------------------------
+
+async function captureScreen() {
+  const { desktopCapturer } = require("electron");
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ["screen"],
+      thumbnailSize: { width: 1280, height: 800 },
+    });
+
+    if (sources.length === 0) {
+      console.log("[capture] No screen sources available");
+      return null;
+    }
+
+    const thumbnail = sources[0].thumbnail;
+    const pngBuffer = thumbnail.toPNG();
+    const base64 = pngBuffer.toString("base64");
+    console.log(`[capture] Screenshot captured (${Math.round(pngBuffer.length / 1024)}KB)`);
+    return base64;
+  } catch (err) {
+    console.error("[capture] Failed:", err.message);
+    return null;
+  }
+}
+
+async function captureAndAnalyze() {
+  const imageBase64 = await captureScreen();
+  if (!imageBase64) return;
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/companion/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: imageBase64 }),
+    });
+
+    if (!response.ok) {
+      console.error(`[companion] Analysis failed: HTTP ${response.status}`);
+      return;
+    }
+
+    const result = await response.json();
+    console.log(`[companion] Activity: ${result.activity}`);
+    console.log(`[companion] Should speak: ${result.should_speak}`);
+
+    if (result.should_speak && result.message && companionWindow) {
+      companionWindow.webContents.send("companion:message", {
+        text: result.message,
+        directive: result.mood ? { pose: result.mood } : undefined,
+      });
+      console.log(`[companion] Sent message: ${result.message}`);
+    }
+  } catch (err) {
+    console.error("[companion] Analysis error:", err.message);
+  }
+}
+
+function startCompanionLoop() {
+  stopCompanionLoop();
+  console.log(`[companion] Starting loop (interval: ${companionIntervalMs / 1000}s)`);
+  // Capture immediately, then on interval
+  captureAndAnalyze();
+  companionTimerId = setInterval(() => captureAndAnalyze(), companionIntervalMs);
+}
+
+function stopCompanionLoop() {
+  if (companionTimerId) {
+    clearInterval(companionTimerId);
+    companionTimerId = null;
+    console.log("[companion] Loop stopped");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -384,7 +479,12 @@ function registerGlobalShortcuts() {
     toggleSpotlight();
   });
 
-  console.log("[shortcuts] Global shortcuts registered");
+  globalShortcut.register("CommandOrControl+Shift+S", () => {
+    console.log("[shortcut] Cmd+Shift+S pressed — immediate capture");
+    captureAndAnalyze();
+  });
+
+  console.log("[shortcuts] Global shortcuts registered (Cmd+Shift+H, Cmd+Shift+S)");
 }
 
 // ---------------------------------------------------------------------------
@@ -417,6 +517,25 @@ function createTray() {
       click: () => {
         if (mainWindow) mainWindow.hide();
       },
+    },
+    { type: "separator" },
+    {
+      label: "实时陪伴模式",
+      type: "checkbox",
+      checked: false,
+      click: (menuItem) => {
+        companionEnabled = menuItem.checked;
+        console.log(`[companion] Mode ${companionEnabled ? "enabled" : "disabled"} via tray`);
+        if (companionEnabled) {
+          startCompanionLoop();
+        } else {
+          stopCompanionLoop();
+        }
+      },
+    },
+    {
+      label: "立即截屏分析 (⌘⇧S)",
+      click: () => captureAndAnalyze(),
     },
     { type: "separator" },
     {

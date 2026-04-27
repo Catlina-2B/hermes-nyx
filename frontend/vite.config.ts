@@ -4,6 +4,10 @@ import { resolve } from "path";
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: "jsdom",
+    globals: true,
+  },
   build: {
     rollupOptions: {
       input: {

@@ -224,6 +224,49 @@ async def ws_logs(ws: WebSocket):
             summary_task.cancel()
 
 
+# ── Companion API ────────────────────────────────────────
+
+from companion import analyze_screenshot
+
+
+class ScreenshotRequest(BaseModel):
+    image: str  # base64 encoded PNG
+
+
+class CompanionStatusResponse(BaseModel):
+    enabled: bool
+    interval_minutes: int
+
+
+_companion_enabled = False
+_companion_interval = 5
+
+
+@app.post("/api/companion/analyze")
+async def companion_analyze(req: ScreenshotRequest):
+    result = await analyze_screenshot(req.image)
+    return result
+
+
+@app.get("/api/companion/status")
+async def companion_status():
+    return {"enabled": _companion_enabled, "interval_minutes": _companion_interval}
+
+
+@app.post("/api/companion/toggle")
+async def companion_toggle():
+    global _companion_enabled
+    _companion_enabled = not _companion_enabled
+    return {"enabled": _companion_enabled}
+
+
+@app.post("/api/companion/interval")
+async def companion_set_interval(minutes: int = 5):
+    global _companion_interval
+    _companion_interval = max(1, min(30, minutes))
+    return {"interval_minutes": _companion_interval}
+
+
 # ── Static Files (production) ────────────────────────────
 
 _dist_env = os.environ.get("HERMES_FRONTEND_DIST")
