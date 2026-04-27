@@ -110,11 +110,11 @@ export default function CompanionApp() {
         <DigitalHumanPanel expressionCallbackRef={chatDirectiveRef} showRoom={false} />
       </div>
 
-      {/* Speech Bubble — top of window, grows downward so text is never clipped */}
+      {/* Speech Bubble — compact, max 3 lines, at top */}
       {bubble && (
         <div className="absolute top-1 left-1 right-1 z-50 animate-fade-in pointer-events-none">
           <div className="relative px-3 py-2 rounded-xl bg-[#0d1220]/92 border border-cyan-400/25 backdrop-blur-sm shadow-[0_0_15px_rgba(34,211,238,0.12)]">
-            <p className="text-[11px] font-mono text-cyber-text leading-relaxed break-words whitespace-pre-wrap">{bubble.text}</p>
+            <p className="text-[11px] font-mono text-cyber-text leading-relaxed break-words line-clamp-3">{bubble.text}</p>
           </div>
         </div>
       )}
