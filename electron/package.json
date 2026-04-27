@@ -1,0 +1,48 @@
+{
+  "name": "hermes-desktop",
+  "version": "0.1.0",
+  "description": "Hermes AI Desktop Companion",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:dir": "electron-builder --dir"
+  },
+  "author": "Hermes",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.hermes.desktop",
+    "productName": "Hermes",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": ["dmg", "dir"],
+      "extendInfo": {
+        "NSScreenCaptureUsageDescription": "Hermes needs screen recording access for the AI companion feature."
+      }
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "icons/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": ["**/*", "!.venv/**", "!__pycache__/**", "!*.pyc"]
+      },
+      {
+        "from": "../frontend/dist",
+        "to": "frontend-dist"
+      },
+      {
+        "from": "../frontend/public/models",
+        "to": "models"
+      }
+    ]
+  }
+}
