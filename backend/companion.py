@@ -46,9 +46,18 @@ def _get_openai_client() -> Optional["OpenAI"]:
         return None
     config = load_hermes_config()
     api_key = config.get("api_key") or os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        return None
+
+    # base_url can be top-level or inside model dict
+    raw_model = config.get("model", {})
     base_url = config.get("base_url")
+    if not base_url and isinstance(raw_model, dict):
+        base_url = raw_model.get("base_url")
+
+    if not api_key and not base_url:
+        return None
+    # For local endpoints, api_key can be a dummy value
+    if not api_key:
+        api_key = "not-needed"
     return OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
 
 
@@ -68,7 +77,12 @@ async def analyze_screenshot(image_base64: str) -> dict:
         }
 
     config = load_hermes_config()
-    model = config.get("vision_model", config.get("model", "gpt-4o"))
+    # model config can be a string or dict with "default" key
+    raw_model = config.get("vision_model") or config.get("model", "gpt-4o")
+    if isinstance(raw_model, dict):
+        model = raw_model.get("default", "gpt-4o")
+    else:
+        model = raw_model
 
     try:
         response = client.chat.completions.create(

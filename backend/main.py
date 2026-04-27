@@ -107,6 +107,24 @@ async def reorder_todos(body: TodoReorder):
     return todo_store.reorder_todos(body.ordered_ids)
 
 
+# ── REST: Quick Chat (for Spotlight) ──────────────────────
+
+class QuickChatRequest(BaseModel):
+    content: str
+
+
+from fastapi.responses import StreamingResponse
+
+
+@app.post("/api/chat/quick")
+async def quick_chat(req: QuickChatRequest):
+    """Simple streaming POST endpoint for Spotlight input."""
+    async def event_stream():
+        async for event in chat_manager.send_message(req.content):
+            yield f"data: {json.dumps(event)}\n\n"
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
 # ── WebSocket: Chat (WS1) ────────────────────────────────
 
 @app.websocket("/ws/chat")

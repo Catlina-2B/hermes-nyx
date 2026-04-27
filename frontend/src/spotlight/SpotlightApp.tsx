@@ -51,7 +51,7 @@ export default function SpotlightApp() {
     (window as any).hermesDesktop?.spotlightExpand?.();
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/chat`, {
+      const res = await fetch(`${BACKEND_URL}/api/chat/quick`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: text }),
