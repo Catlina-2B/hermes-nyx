@@ -3,4 +3,4 @@ uvicorn[standard]==0.34.2
 websockets==15.0.1
 psutil==7.0.0
 pyyaml==6.0.2
-openai==1.78.1
+openai>=2.0.0
