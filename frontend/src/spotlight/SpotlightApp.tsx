@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { parseChatDirectives } from "../plugins/chatDirectives";
 
 const BACKEND_URL = "http://localhost:8081";
 
@@ -77,7 +78,7 @@ export default function SpotlightApp() {
                 const data = JSON.parse(line.slice(6));
                 if (data.type === "chunk" && data.content) {
                   fullReply += data.content;
-                  setReply(fullReply);
+                  setReply(parseChatDirectives(fullReply).text);
                 }
               } catch { /* skip non-JSON lines */ }
             }
