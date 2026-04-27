@@ -31,7 +31,7 @@
             "app quit 时 kill 后端子进程",
             "处理后端崩溃重启"
           ],
-          "passes": false
+          "passes": true
         },
         {
           "id": "F003",
@@ -44,7 +44,7 @@
             "显示加载界面直到前端就绪",
             "窗口标题、图标、最小尺寸配置"
           ],
-          "passes": false
+          "passes": true
         },
         {
           "id": "F004",
@@ -56,7 +56,7 @@
             "点击托盘图标切换主窗口显示",
             "关闭主窗口时最小化到托盘而非退出"
           ],
-          "passes": false
+          "passes": true
         }
       ]
     },
