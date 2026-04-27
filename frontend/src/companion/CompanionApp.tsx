@@ -110,13 +110,13 @@ export default function CompanionApp() {
         <DigitalHumanPanel expressionCallbackRef={chatDirectiveRef} showRoom={false} />
       </div>
 
-      {/* Speech Bubble */}
+      {/* Speech Bubble — positioned above the character, auto-width */}
       {bubble && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 max-w-[280px] animate-fade-in">
-          <div className="relative px-4 py-2.5 rounded-2xl bg-[#0d1220]/90 border border-cyan-400/30 backdrop-blur-sm shadow-[0_0_20px_rgba(34,211,238,0.15)]">
-            <p className="text-xs font-mono text-cyber-text leading-relaxed">{bubble.text}</p>
-            {/* Bubble tail */}
-            <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 bg-[#0d1220]/90 border-r border-b border-cyan-400/30" />
+        <div className="absolute bottom-[calc(100%-40px)] left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-[320px] animate-fade-in pointer-events-none">
+          <div className="relative px-3 py-2 rounded-xl bg-[#0d1220]/92 border border-cyan-400/25 backdrop-blur-sm shadow-[0_0_15px_rgba(34,211,238,0.12)]">
+            <p className="text-[11px] font-mono text-cyber-text leading-relaxed break-words">{bubble.text}</p>
+            {/* Bubble tail pointing down */}
+            <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rotate-45 bg-[#0d1220]/92 border-r border-b border-cyan-400/25" />
           </div>
         </div>
       )}

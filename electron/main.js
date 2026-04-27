@@ -420,14 +420,14 @@ async function captureAndAnalyze() {
 
   // Show immediate feedback
   if (companionWindow) {
-    companionWindow.webContents.send("companion:message", { text: "📸 正在截屏分析..." });
+    companionWindow.webContents.send("companion:message", { text: "让我看看你在干嘛～" });
   }
 
   const imageBase64 = await captureScreen();
   if (!imageBase64) {
     console.log("[companion] captureScreen returned null");
     if (companionWindow) {
-      companionWindow.webContents.send("companion:message", { text: "❌ 截屏失败，请检查录屏权限" });
+      companionWindow.webContents.send("companion:message", { text: "看不到你的屏幕呢，检查下录屏权限？" });
     }
     return;
   }
@@ -458,10 +458,7 @@ async function captureAndAnalyze() {
         });
         console.log(`[companion] Sent message: ${result.message}`);
       } else {
-        // Brief activity indicator even when not speaking
-        companionWindow.webContents.send("companion:message", {
-          text: `👀 ${result.activity}`,
-        });
+        console.log(`[companion] Not speaking (activity: ${result.activity})`);
       }
     }
   } catch (err) {
