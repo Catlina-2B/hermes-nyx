@@ -418,9 +418,11 @@ async function captureScreen() {
 async function captureAndAnalyze() {
   console.log("[companion] captureAndAnalyze started");
 
-  // Show immediate feedback
+  // Show thinking pose while analyzing
   if (companionWindow) {
-    companionWindow.webContents.send("companion:message", { text: "让我看看你在干嘛～" });
+    companionWindow.webContents.send("companion:message", {
+      directive: { pose: "thinking" },
+    });
   }
 
   const imageBase64 = await captureScreen();
@@ -451,14 +453,27 @@ async function captureAndAnalyze() {
     console.log(`[companion] Should speak: ${result.should_speak}`);
 
     if (companionWindow) {
+      // Map mood to pose + expression
+      const moodMap = {
+        happy:     { pose: "wave", happy: 0.8 },
+        curious:   { pose: "cute_tilt", relaxed: 0.5 },
+        concerned: { pose: "thinking", sad: 0.3 },
+        neutral:   { pose: "hands_behind", relaxed: 0.3 },
+      };
+
       if (result.should_speak && result.message) {
+        const directive = moodMap[result.mood] || moodMap.neutral;
         companionWindow.webContents.send("companion:message", {
           text: result.message,
-          directive: result.mood ? { pose: result.mood } : undefined,
+          directive,
         });
-        console.log(`[companion] Sent message: ${result.message}`);
+        console.log(`[companion] ${result.mood}: ${result.message}`);
       } else {
-        console.log(`[companion] Not speaking (activity: ${result.activity})`);
+        // Return to default pose
+        companionWindow.webContents.send("companion:message", {
+          directive: { pose: "hands_behind" },
+        });
+        console.log(`[companion] Not speaking (${result.activity})`);
       }
     }
   } catch (err) {
