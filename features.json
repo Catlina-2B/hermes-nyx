@@ -17,7 +17,7 @@
             "创建 electron/preload.js 预加载脚本",
             "能通过 npm start 启动 Electron 并显示空白窗口"
           ],
-          "passes": false
+          "passes": true
         },
         {
           "id": "F002",
