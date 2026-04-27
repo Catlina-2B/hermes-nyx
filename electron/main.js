@@ -359,37 +359,56 @@ function setupCompanionIPC() {
 
 async function captureScreen() {
   try {
-    // Use BrowserWindow-based screen capture (works in Electron 35+)
-    // Create a hidden window, capture its screen via webContents
-    const displays = screen.getAllDisplays();
-    const primaryDisplay = displays[0];
-    const { width, height } = primaryDisplay.size;
-
-    // Use the main window to capture the screen
-    const win = mainWindow || companionWindow;
-    if (!win) {
-      console.log("[capture] No window available for capture");
-      return null;
+    // Method 1: Try desktopCapturer (may work in some Electron versions)
+    const { desktopCapturer } = require("electron");
+    try {
+      const sources = await desktopCapturer.getSources({
+        types: ["screen"],
+        thumbnailSize: { width: 1280, height: 800 },
+      });
+      if (sources.length > 0) {
+        const pngBuffer = sources[0].thumbnail.toPNG();
+        if (pngBuffer.length > 1000) {
+          console.log(`[capture] desktopCapturer OK (${Math.round(pngBuffer.length / 1024)}KB)`);
+          return pngBuffer.toString("base64");
+        }
+      }
+    } catch (e) {
+      console.log("[capture] desktopCapturer failed, trying alternatives...");
     }
 
-    // Take screenshot using exec + screencapture (macOS native, most reliable)
-    const { execSync } = require("child_process");
-    const tmpFile = path.join(require("os").tmpdir(), `hermes-capture-${Date.now()}.png`);
-
-    execSync(`screencapture -x -C ${tmpFile}`, { timeout: 5000 });
-
-    const fs = require("fs");
-    if (!fs.existsSync(tmpFile)) {
-      console.log("[capture] screencapture produced no file");
-      return null;
+    // Method 2: Capture the main window content (doesn't need screen recording permission)
+    const win = mainWindow;
+    if (win) {
+      const image = await win.webContents.capturePage();
+      const pngBuffer = image.toPNG();
+      if (pngBuffer.length > 1000) {
+        console.log(`[capture] capturePage OK (${Math.round(pngBuffer.length / 1024)}KB)`);
+        return pngBuffer.toString("base64");
+      }
     }
 
-    const pngBuffer = fs.readFileSync(tmpFile);
-    fs.unlinkSync(tmpFile);
+    // Method 3: Try native screencapture command
+    try {
+      const { execSync } = require("child_process");
+      const os = require("os");
+      const fs = require("fs");
+      const tmpFile = path.join(os.tmpdir(), `hermes-capture-${Date.now()}.png`);
+      execSync(`/usr/sbin/screencapture -x -C "${tmpFile}"`, { timeout: 5000 });
+      if (fs.existsSync(tmpFile)) {
+        const pngBuffer = fs.readFileSync(tmpFile);
+        fs.unlinkSync(tmpFile);
+        if (pngBuffer.length > 1000) {
+          console.log(`[capture] screencapture OK (${Math.round(pngBuffer.length / 1024)}KB)`);
+          return pngBuffer.toString("base64");
+        }
+      }
+    } catch (e) {
+      console.log("[capture] screencapture failed:", e.message);
+    }
 
-    const base64 = pngBuffer.toString("base64");
-    console.log(`[capture] Screenshot captured via screencapture (${Math.round(pngBuffer.length / 1024)}KB)`);
-    return base64;
+    console.log("[capture] All capture methods failed");
+    return null;
   } catch (err) {
     console.error("[capture] Failed:", err.message);
     return null;
