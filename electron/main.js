@@ -389,8 +389,23 @@ async function captureScreen() {
 }
 
 async function captureAndAnalyze() {
+  console.log("[companion] captureAndAnalyze started");
+
+  // Show immediate feedback
+  if (companionWindow) {
+    companionWindow.webContents.send("companion:message", { text: "📸 正在截屏分析..." });
+  }
+
   const imageBase64 = await captureScreen();
-  if (!imageBase64) return;
+  if (!imageBase64) {
+    console.log("[companion] captureScreen returned null");
+    if (companionWindow) {
+      companionWindow.webContents.send("companion:message", { text: "❌ 截屏失败，请检查录屏权限" });
+    }
+    return;
+  }
+
+  console.log(`[companion] Got screenshot, sending to analyze (${Math.round(imageBase64.length / 1024)}KB)`);
 
   try {
     const response = await fetch(`${BACKEND_URL}/api/companion/analyze`, {
@@ -424,6 +439,9 @@ async function captureAndAnalyze() {
     }
   } catch (err) {
     console.error("[companion] Analysis error:", err.message);
+    if (companionWindow) {
+      companionWindow.webContents.send("companion:message", { text: `❌ ${err.message}` });
+    }
   }
 }
 
