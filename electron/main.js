@@ -34,30 +34,39 @@ let isQuitting = false;
 // ---------------------------------------------------------------------------
 
 function findPython() {
-  // Prefer venv if it exists
-  const venvPython = path.join(BACKEND_DIR, ".venv", "bin", "python3");
-  return venvPython; // init.sh or startup ensures venv exists
+  const fs = require("fs");
+  // Check both venv paths (start.sh uses "venv", init.sh uses ".venv")
+  for (const name of ["venv", ".venv"]) {
+    const p = path.join(BACKEND_DIR, name, "bin", "python3");
+    if (fs.existsSync(p)) return p;
+  }
+  return "python3"; // fallback to system python
+}
+
+function findVenvDir() {
+  const fs = require("fs");
+  for (const name of ["venv", ".venv"]) {
+    const p = path.join(BACKEND_DIR, name);
+    if (fs.existsSync(path.join(p, "bin", "python3"))) return p;
+  }
+  return path.join(BACKEND_DIR, "venv");
 }
 
 function startBackend() {
   return new Promise((resolve, reject) => {
-    const python = findPython();
-    const args = [
-      "-m", "uvicorn",
-      "main:app",
-      "--host", "0.0.0.0",
-      "--port", String(BACKEND_PORT),
-    ];
+    // Use bash + source activate to match start.sh behavior
+    const venvDir = findVenvDir();
+    const activatePath = path.join(venvDir, "bin", "activate");
+    const cmd = `source "${activatePath}" && uvicorn main:app --host 0.0.0.0 --port ${BACKEND_PORT}`;
 
-    console.log(`[backend] Starting: ${python} ${args.join(" ")}`);
+    console.log(`[backend] Starting: bash -c '${cmd}'`);
     console.log(`[backend] CWD: ${BACKEND_DIR}`);
 
-    backendProcess = spawn(python, args, {
+    backendProcess = spawn("bash", ["-c", cmd], {
       cwd: BACKEND_DIR,
       stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...process.env,
-        // Load .env if exists
         PYTHONUNBUFFERED: "1",
       },
     });
@@ -126,11 +135,11 @@ function stopBackend() {
 
 function ensureVenv() {
   return new Promise((resolve, reject) => {
-    const venvPath = path.join(BACKEND_DIR, ".venv");
+    const venvPath = findVenvDir();
     const fs = require("fs");
 
     if (fs.existsSync(path.join(venvPath, "bin", "python3"))) {
-      console.log("[setup] Venv exists, checking deps...");
+      console.log(`[setup] Venv exists at ${venvPath}, checking deps...`);
       installDeps().then(resolve).catch(reject);
       return;
     }
@@ -152,7 +161,7 @@ function ensureVenv() {
 
 function installDeps() {
   return new Promise((resolve, reject) => {
-    const pip = path.join(BACKEND_DIR, ".venv", "bin", "pip");
+    const pip = path.join(findVenvDir(), "bin", "pip");
     const reqFile = path.join(BACKEND_DIR, "requirements.txt");
     console.log("[setup] Installing Python dependencies...");
 
