@@ -293,9 +293,10 @@ function setupCompanionIPC() {
 
   ipcMain.on("companion:drag-move", (_event, deltaX, deltaY) => {
     if (!companionWindow || !companionDragStart) return;
+    if (typeof deltaX !== "number" || typeof deltaY !== "number") return;
     companionWindow.setPosition(
-      companionDragStart.winX + deltaX,
-      companionDragStart.winY + deltaY,
+      Math.round(companionDragStart.winX + deltaX),
+      Math.round(companionDragStart.winY + deltaY),
     );
   });
 
@@ -621,6 +622,11 @@ app.on("ready", async () => {
   console.log("[app] Hermes starting...");
   console.log(`[app] Dev mode: ${IS_DEV}`);
   console.log(`[app] Backend dir: ${BACKEND_DIR}`);
+
+  // Clear cache to ensure fresh frontend assets are loaded
+  const { session } = require("electron");
+  await session.defaultSession.clearCache();
+  console.log("[app] Cache cleared");
 
   try {
     await ensureVenv();

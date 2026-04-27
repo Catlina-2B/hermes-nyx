@@ -13,6 +13,12 @@ export default function CompanionApp() {
   const chatDirectiveRef = useRef<ChatDirectiveHandler | null>(null);
   const [bubble, setBubble] = useState<BubbleMessage | null>(null);
 
+  // Override global.css body background for transparent window
+  useEffect(() => {
+    document.body.style.background = "transparent";
+    document.documentElement.style.background = "transparent";
+  }, []);
+
   // Listen for companion messages from Electron main process
   useEffect(() => {
     const hermesDesktop = (window as any).hermesDesktop;
