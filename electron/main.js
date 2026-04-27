@@ -17,9 +17,16 @@ const BACKEND_DIR = IS_DEV
   ? path.join(PROJECT_ROOT, "backend")
   : path.join(process.resourcesPath, "backend");
 
-const FRONTEND_URL = IS_DEV
-  ? BACKEND_URL // dev: FastAPI serves built frontend
-  : BACKEND_URL;
+// Writable user data dir for venv + data (packaged .app is read-only)
+const USER_DATA_DIR = IS_DEV
+  ? BACKEND_DIR
+  : path.join(app.getPath("userData"), "backend-runtime");
+
+const FRONTEND_DIST = IS_DEV
+  ? path.join(PROJECT_ROOT, "frontend", "dist")
+  : path.join(process.resourcesPath, "frontend-dist");
+
+const FRONTEND_URL = BACKEND_URL; // FastAPI serves built frontend
 
 // ---------------------------------------------------------------------------
 // State
@@ -48,11 +55,16 @@ function findPython() {
 
 function findVenvDir() {
   const fs = require("fs");
-  for (const name of ["venv", ".venv"]) {
-    const p = path.join(BACKEND_DIR, name);
-    if (fs.existsSync(path.join(p, "bin", "python3"))) return p;
+  // In dev, check backend dir for existing venv
+  if (IS_DEV) {
+    for (const name of ["venv", ".venv"]) {
+      const p = path.join(BACKEND_DIR, name);
+      if (fs.existsSync(path.join(p, "bin", "python3"))) return p;
+    }
+    return path.join(BACKEND_DIR, "venv");
   }
-  return path.join(BACKEND_DIR, "venv");
+  // In packaged mode, use writable user data dir
+  return path.join(USER_DATA_DIR, "venv");
 }
 
 function startBackend() {
@@ -71,6 +83,7 @@ function startBackend() {
       env: {
         ...process.env,
         PYTHONUNBUFFERED: "1",
+        HERMES_FRONTEND_DIST: FRONTEND_DIST,
       },
     });
 
@@ -140,6 +153,9 @@ function ensureVenv() {
   return new Promise((resolve, reject) => {
     const venvPath = findVenvDir();
     const fs = require("fs");
+
+    // Ensure writable directory exists
+    fs.mkdirSync(path.dirname(venvPath), { recursive: true });
 
     if (fs.existsSync(path.join(venvPath, "bin", "python3"))) {
       console.log(`[setup] Venv exists at ${venvPath}, checking deps...`);
@@ -249,9 +265,7 @@ function createCompanionWindow() {
   });
 
   // Load companion page
-  const companionURL = IS_DEV
-    ? `${BACKEND_URL}/companion.html`
-    : `file://${path.join(process.resourcesPath, "frontend-dist", "companion.html")}`;
+  const companionURL = `${BACKEND_URL}/companion.html`;
 
   companionWindow.loadURL(companionURL);
   companionWindow.setVisibleOnAllWorkspaces(true);
@@ -325,9 +339,7 @@ function createSpotlightWindow() {
     },
   });
 
-  const spotlightURL = IS_DEV
-    ? `${BACKEND_URL}/spotlight.html`
-    : `file://${path.join(process.resourcesPath, "frontend-dist", "spotlight.html")}`;
+  const spotlightURL = `${BACKEND_URL}/spotlight.html`;
 
   spotlightWindow.loadURL(spotlightURL);
 

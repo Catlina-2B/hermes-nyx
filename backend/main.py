@@ -226,7 +226,8 @@ async def ws_logs(ws: WebSocket):
 
 # ── Static Files (production) ────────────────────────────
 
-DIST_DIR = Path(__file__).parent.parent / "frontend" / "dist"
+_dist_env = os.environ.get("HERMES_FRONTEND_DIST")
+DIST_DIR = Path(_dist_env) if _dist_env else Path(__file__).parent.parent / "frontend" / "dist"
 if DIST_DIR.exists():
     app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="assets")
 

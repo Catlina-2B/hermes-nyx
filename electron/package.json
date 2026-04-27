@@ -33,15 +33,11 @@
       {
         "from": "../backend",
         "to": "backend",
-        "filter": ["**/*", "!.venv/**", "!__pycache__/**", "!*.pyc"]
+        "filter": ["**/*", "!.venv/**", "!venv/**", "!__pycache__/**", "!*.pyc"]
       },
       {
         "from": "../frontend/dist",
         "to": "frontend-dist"
-      },
-      {
-        "from": "../frontend/public/models",
-        "to": "models"
       }
     ]
   }
