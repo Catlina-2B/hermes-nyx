@@ -625,6 +625,11 @@ app.on("ready", async () => {
   await session.defaultSession.clearCache();
   console.log("[app] Cache cleared");
 
+  // Set Dock icon (dev mode uses default Electron icon otherwise)
+  if (process.platform === "darwin" && app.dock) {
+    app.dock.setIcon(path.join(__dirname, "icons", "icon.png"));
+  }
+
   try {
     await ensureVenv();
     await startBackend();
