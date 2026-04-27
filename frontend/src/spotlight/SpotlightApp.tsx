@@ -40,6 +40,12 @@ export default function SpotlightApp() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Detect if user is asking about screen content
+  const isScreenQuestion = useCallback((text: string) => {
+    const keywords = ["屏幕", "看到", "这个", "当前", "这是什么", "这里", "界面", "页面", "screen", "what is this", "这段"];
+    return keywords.some((kw) => text.toLowerCase().includes(kw));
+  }, []);
+
   const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (!text || loading) return;
@@ -50,6 +56,23 @@ export default function SpotlightApp() {
 
     // Notify main process to resize window
     (window as any).hermesDesktop?.spotlightExpand?.();
+
+    // If asking about screen → capture and ask with context
+    if (isScreenQuestion(text)) {
+      try {
+        const hd = (window as any).hermesDesktop;
+        if (hd?.captureAndAsk) {
+          const result = await hd.captureAndAsk(text);
+          setReply(result?.answer || "无法分析屏幕内容");
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        setReply(`分析失败: ${err instanceof Error ? err.message : "Unknown"}`);
+        setLoading(false);
+        return;
+      }
+    }
 
     try {
       const res = await fetch(`${BACKEND_URL}/api/chat/quick`, {

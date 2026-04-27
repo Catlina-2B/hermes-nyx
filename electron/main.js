@@ -341,6 +341,25 @@ function setupCompanionIPC() {
     if (companionWindow) companionWindow.webContents.send("avatar:switched", location);
   });
 
+  // Capture screen + answer question (for Spotlight context-aware queries)
+  ipcMain.handle("companion:capture-and-ask", async (_event, question) => {
+    console.log(`[companion] Context query: ${question}`);
+    const imageBase64 = await captureScreen();
+    if (!imageBase64) return { answer: "无法获取屏幕内容" };
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/companion/ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: imageBase64, question }),
+      });
+      if (!response.ok) return { answer: `请求失败: ${response.status}` };
+      return await response.json();
+    } catch (err) {
+      return { answer: `分析失败: ${err.message}` };
+    }
+  });
+
   // Spotlight IPC
   ipcMain.on("spotlight:hide", () => {
     if (spotlightWindow) spotlightWindow.hide();
@@ -464,11 +483,17 @@ async function captureAndAnalyze() {
 
       if (result.should_speak && result.message) {
         const directive = moodMap[result.mood] || moodMap.neutral;
+        let text = result.message;
+        // Append todo notification if any were created
+        if (result.todos && result.todos.length > 0) {
+          text += `\n📋 已添加 ${result.todos.length} 条待办`;
+        }
         companionWindow.webContents.send("companion:message", {
-          text: result.message,
+          text,
           directive,
         });
         console.log(`[companion] ${result.mood}: ${result.message}`);
+        if (result.todos?.length) console.log(`[companion] Created ${result.todos.length} todos`);
       } else {
         // Return to default pose
         companionWindow.webContents.send("companion:message", {

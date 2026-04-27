@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld("hermesDesktop", {
   // Spotlight controls
   hideSpotlight: () => ipcRenderer.send("spotlight:hide"),
   spotlightExpand: () => ipcRenderer.send("spotlight:expand"),
+  // Capture screen and ask question about it
+  captureAndAsk: (question) => ipcRenderer.invoke("companion:capture-and-ask", question),
 
   // Platform info
   platform: process.platform,

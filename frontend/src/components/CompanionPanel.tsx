@@ -6,6 +6,8 @@ interface AnalysisEntry {
   should_speak: boolean;
   message: string;
   mood: string;
+  todos?: string[];
+  skill_used?: string;
 }
 
 const MOOD_EMOJI: Record<string, string> = {
@@ -13,6 +15,15 @@ const MOOD_EMOJI: Record<string, string> = {
   curious: "🤔",
   concerned: "😟",
   neutral: "😐",
+};
+
+const SKILL_LABEL: Record<string, string> = {
+  code_review: "🔍 代码",
+  security: "🛡️ 安全",
+  todo: "📋 待办",
+  efficiency: "⚡ 效率",
+  health: "💚 健康",
+  chat: "💬 闲聊",
 };
 
 export default function CompanionPanel() {
@@ -64,10 +75,10 @@ export default function CompanionPanel() {
                 : "border-cyber-border bg-cyber-panel/50"
             }`}
           >
-            {/* Time + mood */}
+            {/* Time + skill + mood */}
             <div className="flex items-center justify-between text-[10px] text-cyber-muted">
-              <span>{entry.timestamp}</span>
-              <span>{MOOD_EMOJI[entry.mood] || "😐"} {entry.mood}</span>
+              <span>{entry.timestamp} {SKILL_LABEL[entry.skill_used || ""] || ""}</span>
+              <span>{MOOD_EMOJI[entry.mood] || "😐"}</span>
             </div>
 
             {/* Activity */}
@@ -76,8 +87,17 @@ export default function CompanionPanel() {
             {/* Message (if AI spoke) */}
             {entry.should_speak && entry.message && (
               <p className="text-cyber-accent border-l-2 border-cyan-400/30 pl-2 mt-1">
-                💬 {entry.message}
+                {entry.message}
               </p>
+            )}
+
+            {/* Todos created */}
+            {entry.todos && entry.todos.length > 0 && (
+              <div className="mt-1 space-y-0.5">
+                {entry.todos.map((t, j) => (
+                  <p key={j} className="text-[10px] text-cyber-warn">📋 {t}</p>
+                ))}
+              </div>
             )}
           </div>
         ))}

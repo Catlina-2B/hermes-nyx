@@ -244,7 +244,7 @@ async def ws_logs(ws: WebSocket):
 
 # ── Companion API ────────────────────────────────────────
 
-from companion import analyze_screenshot, get_analysis_history
+from companion import analyze_screenshot, analyze_with_question, get_analysis_history
 
 
 class ScreenshotRequest(BaseModel):
@@ -263,7 +263,26 @@ _companion_interval = 5
 @app.post("/api/companion/analyze")
 async def companion_analyze(req: ScreenshotRequest):
     result = await analyze_screenshot(req.image, chat_manager=chat_manager)
+
+    # Auto-create todos if AI detected any
+    if result.get("todos"):
+        for todo_text in result["todos"]:
+            if todo_text and isinstance(todo_text, str):
+                todo_store.add_todo(todo_text.strip())
+
     return result
+
+
+class ContextAnalyzeRequest(BaseModel):
+    image: str
+    question: str
+
+
+@app.post("/api/companion/ask")
+async def companion_ask(req: ContextAnalyzeRequest):
+    """Answer a question about what's on screen (for Spotlight)."""
+    answer = await analyze_with_question(req.image, req.question)
+    return {"answer": answer}
 
 
 @app.get("/api/companion/status")

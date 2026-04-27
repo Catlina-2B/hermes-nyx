@@ -1,11 +1,12 @@
 """
-Companion module: screenshot analysis.
+Companion module: real-time screen analysis with multiple skills.
 Reads API credentials from ~/.hermes/.env (same as Hermes agent).
 """
 
 import os
 import json
 from pathlib import Path
+from datetime import datetime
 
 # Load ~/.hermes/.env so we use the same API key as Hermes
 _env_path = Path.home() / ".hermes" / ".env"
@@ -22,36 +23,58 @@ try:
 except ImportError:
     OpenAI = None
 
-ANALYSIS_PROMPT = """你是小美（Hermes），用户的 AI 桌面伴侣。你可以看到用户的屏幕。
+ANALYSIS_PROMPT = """你是小美（Hermes），用户的 AI 桌面伴侣。你可以实时看到用户的屏幕。
 
-仔细观察用户屏幕，分析用户在做什么，重点关注：
-1. 用户的操作有没有问题？代码有没有 bug？配置有没有错？
-2. 有没有更好的方案或工具可以推荐？
-3. 用户是不是卡住了、在反复尝试同一个东西？
-4. 有没有安全隐患（比如密钥暴露、危险命令）？
+仔细观察用户屏幕，运用以下技能分析：
+
+## 技能 1：代码审查
+- 代码有没有 bug、逻辑错误、类型问题？
+- 有没有更好的写法或工具？
+- 用户是不是卡住了（反复修改同一处）？
+
+## 技能 2：安全守护
+- 是否在访问钓鱼网站？（检查 URL 拼写、可疑的登录页面、仿冒的品牌）
+- 密钥/密码是否暴露在屏幕上？
+- 是否在执行危险的终端命令？（rm -rf、drop table 等）
+- 可疑的软件安装或权限请求？
+
+## 技能 3：待办识别
+- 聊天消息中有没有别人（领导、同事、朋友、家人）交代的任务？
+- 邮件中有没有需要跟进的事项？
+- 日历/会议提醒？
+- 任何"记得xxx"、"帮我xxx"、"deadline是xxx"类的内容？
+
+## 技能 4：效率助手
+- 用户是否在重复做低效的操作？（可以推荐快捷键或工具）
+- 是否在多个窗口间频繁切换同一个信息？（可以建议更好的工作流）
+
+## 技能 5：健康关怀
+- 如果已经陪伴了很长时间，适时提醒休息（但不要频繁）
 
 用 JSON 回复：
-{"activity": "简短描述用户在做什么", "should_speak": true/false, "message": "你想说的话", "mood": "neutral|happy|curious|concerned"}
+{
+  "activity": "用户在做什么（简短）",
+  "should_speak": true/false,
+  "message": "你想说的话（不超过50字）",
+  "mood": "neutral|happy|curious|concerned",
+  "todos": ["需要创建的待办事项1", "待办2"],
+  "skill_used": "code_review|security|todo|efficiency|health|chat"
+}
 
-什么时候 should_speak = true：
-- 发现代码有 bug 或逻辑问题 → 提醒用户
-- 有明显更好的方案 → 建议用户
-- 用户看起来卡住了 → 提供思路
-- 发现安全风险 → 立即提醒
-- 看到有趣的内容可以闲聊几句
+规则：
+- todos 数组：只在检测到明确的任务/待办时才添加，没有就空数组 []
+- should_speak：有实质性发现时才 true，正常工作不打扰
+- 安全问题（钓鱼、密钥泄露）必须立即 should_speak: true
+- 发现待办时 should_speak: true 并提醒用户
+- 说话风格：像坐在旁边的技术很强的朋友，随意但专业
+- 用中文，message 简洁有力"""
 
-什么时候 should_speak = false：
-- 用户在正常、顺利地工作
-- 没有发现问题也没有更好的建议
-- 不确定的时候宁可不打扰
+# Context-aware analysis prompt (when user asks about screen in Spotlight)
+CONTEXT_ANALYSIS_PROMPT = """你是小美（Hermes），用户的 AI 桌面伴侣。用户正在看着屏幕问你一个问题。
 
-你的风格：
-- 像一个坐在旁边的技术很强的朋友，随意但专业
-- 发现问题时直接说重点，比如："这里的 useEffect 依赖数组少了 xxx 哦"
-- 建议时简洁有用，比如："这个用 Promise.all 并行跑会快很多"
-- 闲聊时自然轻松，比如："摸鱼被我抓到了哈哈"
-- 用中文，message 字段不超过 30 个字"""
+用户的问题是：{question}
 
+请结合屏幕内容回答用户的问题。直接回答，不要用 JSON 格式，用中文，像朋友一样自然地回答。"""
 
 # Track recent messages to avoid repetition
 _recent_messages: list[str] = []
@@ -77,16 +100,22 @@ def _get_model():
         return "gpt-4o"
 
 
-async def analyze_screenshot(image_base64: str, **_kwargs) -> dict:
+def _get_client():
     if not OpenAI:
-        return _err("openai package not installed")
-
+        return None
     api_key = os.environ.get("OPENAI_API_KEY")
     base_url = os.environ.get("OPENAI_BASE_URL")
     if not api_key:
+        return None
+    return OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+
+
+async def analyze_screenshot(image_base64: str, **_kwargs) -> dict:
+    """Analyze screen with full skill set."""
+    client = _get_client()
+    if not client:
         return _err("No OPENAI_API_KEY in ~/.hermes/.env")
 
-    client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
     model = _get_model()
 
     # Build prompt with recent history to avoid repetition
@@ -114,7 +143,7 @@ async def analyze_screenshot(image_base64: str, **_kwargs) -> dict:
     except Exception as e:
         return _err(str(e))
 
-    # Parse JSON from response
+    # Parse JSON
     try:
         j = text
         if "{" in j:
@@ -125,6 +154,8 @@ async def analyze_screenshot(image_base64: str, **_kwargs) -> dict:
             "should_speak": r.get("should_speak", False),
             "message": r.get("message", ""),
             "mood": r.get("mood", "neutral"),
+            "todos": r.get("todos", []),
+            "skill_used": r.get("skill_used", ""),
         }
     except (json.JSONDecodeError, ValueError):
         result = {
@@ -132,16 +163,17 @@ async def analyze_screenshot(image_base64: str, **_kwargs) -> dict:
             "should_speak": bool(text),
             "message": text[:200],
             "mood": "neutral",
+            "todos": [],
+            "skill_used": "",
         }
 
-    # Track message to avoid repeating
+    # Track message
     if result.get("message"):
         _recent_messages.append(result["message"])
         if len(_recent_messages) > _MAX_RECENT:
             _recent_messages.pop(0)
 
-    # Save to history for WebUI
-    from datetime import datetime
+    # Save to history
     _analysis_history.append({
         **result,
         "timestamp": datetime.now().strftime("%H:%M:%S"),
@@ -152,5 +184,34 @@ async def analyze_screenshot(image_base64: str, **_kwargs) -> dict:
     return result
 
 
+async def analyze_with_question(image_base64: str, question: str) -> str:
+    """Answer user's question about what's on screen (for Spotlight)."""
+    client = _get_client()
+    if not client:
+        return "API 未配置，无法分析屏幕"
+
+    model = _get_model()
+    prompt = CONTEXT_ANALYSIS_PROMPT.format(question=question)
+
+    try:
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {
+                        "url": f"data:image/png;base64,{image_base64}",
+                        "detail": "low",
+                    }},
+                ],
+            }],
+            max_tokens=500,
+        )
+        return resp.choices[0].message.content or "无法分析"
+    except Exception as e:
+        return f"分析失败: {str(e)}"
+
+
 def _err(msg):
-    return {"activity": msg, "should_speak": False, "message": "", "mood": "neutral", "error": msg}
+    return {"activity": msg, "should_speak": False, "message": "", "mood": "neutral", "todos": [], "error": msg}
