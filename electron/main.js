@@ -215,6 +215,8 @@ function createMainWindow() {
     minHeight: 600,
     title: "Hermes",
     backgroundColor: "#0a0e17",
+    titleBarStyle: "hidden",
+    trafficLightPosition: { x: 12, y: 14 },
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
