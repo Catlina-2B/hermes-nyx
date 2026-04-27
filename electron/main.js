@@ -250,10 +250,10 @@ function createCompanionWindow() {
   const { width: screenW, height: screenH } = display.workAreaSize;
 
   companionWindow = new BrowserWindow({
-    width: 300,
-    height: 400,
-    x: screenW - 340,
-    y: screenH - 440,
+    width: 400,
+    height: 500,
+    x: screenW - 440,
+    y: screenH - 540,
     frame: false,
     transparent: true,
     alwaysOnTop: true,

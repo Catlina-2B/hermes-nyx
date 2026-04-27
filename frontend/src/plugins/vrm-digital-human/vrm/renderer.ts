@@ -25,9 +25,9 @@ export class VRMRenderer {
     this.scene = new THREE.Scene();
     this.scene.background = null;
 
-    // 相机：全身视角
-    this.camera = new THREE.PerspectiveCamera(25, 1, 0.5, 10);
-    this.camera.position.set(0, 0.7, 4.5);
+    // 相机：全身视角（FOV 稍宽，确保举手时手臂不被裁剪）
+    this.camera = new THREE.PerspectiveCamera(28, 1, 0.5, 10);
+    this.camera.position.set(0, 0.7, 4.8);
     this.camera.lookAt(0, 0.7, 0);
 
     // 灯光
