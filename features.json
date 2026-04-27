@@ -129,7 +129,7 @@
             "快捷键切换输入框窗口显示/隐藏",
             "app 失焦时不影响快捷键"
           ],
-          "passes": false
+          "passes": true
         },
         {
           "id": "F010",
@@ -142,7 +142,7 @@
             "ESC 或失焦时隐藏",
             "显示时自动聚焦输入框"
           ],
-          "passes": false
+          "passes": true
         },
         {
           "id": "F011",
@@ -156,7 +156,7 @@
             "回复区域支持 markdown",
             "发送的消息同步到主窗口聊天历史"
           ],
-          "passes": false
+          "passes": true
         }
       ]
     },
