@@ -113,8 +113,8 @@ export default function CompanionApp() {
       {/* Speech Bubble — compact, max 3 lines, at top */}
       {bubble && (
         <div className="absolute top-1 left-1 right-1 z-50 animate-fade-in pointer-events-none">
-          <div className="relative px-3 py-2 rounded-xl bg-[#0d1220]/92 border border-cyan-400/25 backdrop-blur-sm shadow-[0_0_15px_rgba(34,211,238,0.12)]">
-            <p className="text-[11px] font-mono text-cyber-text leading-relaxed break-words line-clamp-3">{bubble.text}</p>
+          <div className="relative px-3 py-2.5 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+            <p className="text-[11px] font-sans text-white leading-relaxed break-words line-clamp-3">{bubble.text}</p>
           </div>
         </div>
       )}
