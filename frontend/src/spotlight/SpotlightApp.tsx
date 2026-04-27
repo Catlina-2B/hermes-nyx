@@ -115,7 +115,9 @@ export default function SpotlightApp() {
       {/* Input bar */}
       <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-[#0d1220]/95 border border-cyan-400/20 backdrop-blur-xl shadow-[0_0_40px_rgba(34,211,238,0.12)]">
         {/* Hermes icon */}
-        <img src="/hermes-icon-sm.png" alt="H" className="shrink-0 w-6 h-6 rounded-md" />
+        <div className="shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-cyan-400 to-emerald-400 flex items-center justify-center">
+          <span className="text-[10px] font-bold text-cyber-bg">H</span>
+        </div>
 
         <input
           ref={inputRef}
