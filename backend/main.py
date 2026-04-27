@@ -262,7 +262,7 @@ _companion_interval = 5
 
 @app.post("/api/companion/analyze")
 async def companion_analyze(req: ScreenshotRequest):
-    result = await analyze_screenshot(req.image)
+    result = await analyze_screenshot(req.image, chat_manager=chat_manager)
     return result
 
 
