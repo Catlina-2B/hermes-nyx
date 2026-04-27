@@ -577,8 +577,24 @@ function createTray() {
 }
 
 // ---------------------------------------------------------------------------
-// App Lifecycle
+// App Lifecycle — Single Instance Lock
 // ---------------------------------------------------------------------------
+
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  console.log("[app] Another instance is already running — quitting");
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    // Someone tried to launch a second instance — focus the existing window
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
 
 app.on("ready", async () => {
   console.log("[app] Hermes starting...");
