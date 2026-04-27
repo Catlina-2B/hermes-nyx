@@ -97,12 +97,12 @@ export default function CompanionApp() {
   }, []);
 
   return (
-    <div className="relative w-full h-full select-none" onContextMenu={onContextMenu}>
-      {/* Drag handle — entire window is draggable */}
+    <div className="relative w-full h-full select-none">
+      {/* Drag handle — entire window is draggable + right-click menu */}
       <div
         onPointerDown={onDragStart}
+        onContextMenu={onContextMenu}
         className="absolute inset-0 z-40 cursor-grab active:cursor-grabbing"
-        style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
       />
 
       {/* VRM Character */}
