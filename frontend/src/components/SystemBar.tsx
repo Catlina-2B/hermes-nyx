@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSystemInfo } from "../hooks/useSystemInfo";
 import type { AvatarModelOption } from "../plugins/vrm-digital-human/model-options";
 
@@ -19,6 +19,8 @@ export default function SystemBar({
   const [models, setModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [savingModel, setSavingModel] = useState(false);
+  const [companionEnabled, setCompanionEnabled] = useState(false);
+  const [companionInterval, setCompanionInterval] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -44,6 +46,25 @@ export default function SystemBar({
       setSelectedModel(info.model);
     }
   }, [info?.model, selectedModel]);
+
+  // Listen for companion state from Electron
+  useEffect(() => {
+    const hd = (window as any).hermesDesktop;
+    if (!hd?.onCompanionStateChange) return;
+    hd.onCompanionStateChange((enabled: boolean) => setCompanionEnabled(enabled));
+  }, []);
+
+  const toggleCompanion = useCallback(() => {
+    const hd = (window as any).hermesDesktop;
+    hd?.toggleCompanion?.();
+  }, []);
+
+  const onIntervalChange = useCallback((minutes: number) => {
+    const clamped = Math.max(1, Math.min(30, minutes));
+    setCompanionInterval(clamped);
+    const hd = (window as any).hermesDesktop;
+    hd?.setCompanionInterval?.(clamped);
+  }, []);
 
   async function onModelChange(nextModel: string) {
     const previousModel = selectedModel;
@@ -125,6 +146,30 @@ export default function SystemBar({
                 <option key={model.path} value={model.path}>{model.label}</option>
               ))}
             </select>
+            <span className="w-px h-3 bg-cyan-400/15" />
+            <button
+              className={`h-7 rounded-md border px-2 text-[10px] font-mono transition-colors ${
+                companionEnabled
+                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-400/90"
+                  : "border-cyan-400/15 bg-[#0a0e17] text-cyan-300/60 hover:border-cyan-400/35"
+              }`}
+              title={companionEnabled ? "关闭实时陪伴" : "开启实时陪伴"}
+              onClick={toggleCompanion}
+            >
+              {companionEnabled ? "● 陪伴中" : "○ 陪伴"}
+            </button>
+            {companionEnabled && (
+              <select
+                className="h-7 w-16 rounded-md border border-cyan-400/15 bg-[#0a0e17] px-1 text-[10px] text-cyan-300/80 outline-none transition-colors hover:border-cyan-400/35 focus:border-cyan-400/60"
+                value={companionInterval}
+                title="陪伴观察间隔（分钟）"
+                onChange={(e) => onIntervalChange(Number(e.target.value))}
+              >
+                {[1, 2, 3, 5, 10, 15, 30].map((m) => (
+                  <option key={m} value={m}>{m}min</option>
+                ))}
+              </select>
+            )}
             <span className="w-px h-3 bg-cyan-400/15" />
             <span>{info.cpu}</span>
             <span className="w-px h-3 bg-cyan-400/15" />

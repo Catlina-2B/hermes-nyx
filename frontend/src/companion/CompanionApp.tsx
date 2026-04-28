@@ -16,6 +16,7 @@ let msgId = 0;
 export default function CompanionApp() {
   const chatDirectiveRef = useRef<ChatDirectiveHandler | null>(null);
   const [bubble, setBubble] = useState<BubbleMessage | null>(null);
+  const [companionEnabled, setCompanionEnabled] = useState(false);
   const [avatarModelPath, setAvatarModelPath] = useState(() => {
     try {
       return normalizeAvatarModelPath(localStorage.getItem(AVATAR_MODEL_STORAGE_KEY));
@@ -87,25 +88,60 @@ export default function CompanionApp() {
     window.addEventListener("pointerup", onUp);
   }, []);
 
-  // Right-click to switch avatar to webui
+  // Listen for companion mode state changes from Electron
+  useEffect(() => {
+    const hermesDesktop = (window as any).hermesDesktop;
+    if (!hermesDesktop?.onCompanionStateChange) return;
+    hermesDesktop.onCompanionStateChange((enabled: boolean) => {
+      setCompanionEnabled(enabled);
+    });
+  }, []);
+
+  // Right-click context menu
   const onContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     const hd = (window as any).hermesDesktop;
-    if (!hd?.switchAvatarTo) return;
+    if (!hd) return;
 
     const menu = document.createElement("div");
-    menu.className = "fixed z-[9999] py-1 rounded-lg border border-cyan-400/20 bg-[#0d1220]/95 backdrop-blur-xl shadow-[0_0_30px_rgba(34,211,238,0.12)] min-w-[140px]";
+    menu.className = "fixed z-[9999] py-1 rounded-lg border border-cyan-400/20 bg-[#0d1220]/95 backdrop-blur-xl shadow-[0_0_30px_rgba(34,211,238,0.12)] min-w-[160px]";
     menu.style.left = `${e.clientX}px`;
     menu.style.top = `${e.clientY}px`;
 
-    const item = document.createElement("button");
-    item.textContent = "移至客户端内";
-    item.className = "block w-full text-left px-4 py-2 text-xs font-mono text-cyan-200 hover:bg-cyan-400/10 transition-colors";
-    item.onclick = () => {
-      hd.switchAvatarTo("webui");
-      document.body.removeChild(menu);
+    // Item: 实时陪伴模式
+    const companionItem = document.createElement("button");
+    companionItem.textContent = companionEnabled ? "✓ 实时陪伴模式" : "  实时陪伴模式";
+    companionItem.className = "block w-full text-left px-4 py-2 text-xs font-mono text-cyan-200 hover:bg-cyan-400/10 transition-colors";
+    companionItem.onclick = () => {
+      hd.toggleCompanion?.();
+      if (document.body.contains(menu)) document.body.removeChild(menu);
     };
-    menu.appendChild(item);
+    menu.appendChild(companionItem);
+
+    // Item: 立即观察
+    const captureItem = document.createElement("button");
+    captureItem.textContent = "  立即观察 ⌘⇧S";
+    captureItem.className = "block w-full text-left px-4 py-2 text-xs font-mono text-cyan-200 hover:bg-cyan-400/10 transition-colors";
+    captureItem.onclick = () => {
+      hd.captureNow?.();
+      if (document.body.contains(menu)) document.body.removeChild(menu);
+    };
+    menu.appendChild(captureItem);
+
+    // Separator
+    const sep = document.createElement("div");
+    sep.className = "my-1 border-t border-cyan-400/10";
+    menu.appendChild(sep);
+
+    // Item: 移至客户端内
+    const switchItem = document.createElement("button");
+    switchItem.textContent = "  移至客户端内";
+    switchItem.className = "block w-full text-left px-4 py-2 text-xs font-mono text-cyan-200 hover:bg-cyan-400/10 transition-colors";
+    switchItem.onclick = () => {
+      hd.switchAvatarTo?.("webui");
+      if (document.body.contains(menu)) document.body.removeChild(menu);
+    };
+    menu.appendChild(switchItem);
 
     const dismiss = (ev: MouseEvent) => {
       if (!menu.contains(ev.target as Node)) {
@@ -115,7 +151,7 @@ export default function CompanionApp() {
     };
     document.addEventListener("mousedown", dismiss);
     document.body.appendChild(menu);
-  }, []);
+  }, [companionEnabled]);
 
   return (
     <div className="relative w-full h-full select-none">
@@ -137,8 +173,8 @@ export default function CompanionApp() {
 
       {/* Speech Bubble — compact, max 3 lines, at top */}
       {bubble && (
-        <div className="absolute top-1 left-1 right-1 z-50 animate-fade-in pointer-events-none">
-          <div className="relative px-3 py-2.5 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+        <div className="absolute top-2 left-2 z-50 animate-fade-in pointer-events-none max-w-[85%]">
+          <div className="relative px-3 py-2 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
             <p className="text-[11px] font-sans text-white leading-relaxed break-words line-clamp-3">{bubble.text}</p>
           </div>
         </div>

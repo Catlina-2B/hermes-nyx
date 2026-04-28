@@ -15,8 +15,12 @@ contextBridge.exposeInMainWorld("hermesDesktop", {
   toggleCompanion: () => ipcRenderer.send("companion:toggle"),
   captureNow: () => ipcRenderer.send("companion:capture-now"),
   sendToCompanion: (directive) => ipcRenderer.send("companion:send-directive", directive),
+  setCompanionInterval: (minutes) => ipcRenderer.send("companion:set-interval", minutes),
   onCompanionMessage: (callback) => {
     ipcRenderer.on("companion:message", (_event, data) => callback(data));
+  },
+  onCompanionStateChange: (callback) => {
+    ipcRenderer.on("companion:state-changed", (_event, enabled) => callback(enabled));
   },
 
   // Avatar location switching (desktop ↔ webui)

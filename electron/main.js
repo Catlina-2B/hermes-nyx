@@ -40,7 +40,7 @@ let isQuitting = false;
 let companionDragStart = null; // { winX, winY } at drag start
 let companionTimerId = null;
 let companionEnabled = false;
-let companionIntervalMs = 5 * 60 * 1000; // 5 minutes default
+let companionIntervalMs = 1 * 60 * 1000; // 1 minute default
 
 // ---------------------------------------------------------------------------
 // Python Backend
@@ -315,6 +315,18 @@ function setupCompanionIPC() {
     } else {
       stopCompanionLoop();
     }
+    broadcastCompanionState();
+  });
+
+  // Update companion interval from WebUI (minutes)
+  ipcMain.on("companion:set-interval", (_event, minutes) => {
+    const mins = Math.max(1, Math.min(30, Number(minutes) || 1));
+    companionIntervalMs = mins * 60 * 1000;
+    console.log(`[companion] Interval set to ${mins}min`);
+    // Restart loop if active
+    if (companionEnabled) {
+      startCompanionLoop();
+    }
   });
 
   ipcMain.on("companion:capture-now", async () => {
@@ -512,6 +524,13 @@ async function captureAndAnalyze() {
   }
 }
 
+function broadcastCompanionState() {
+  const windows = [mainWindow, companionWindow];
+  for (const win of windows) {
+    if (win) win.webContents.send("companion:state-changed", companionEnabled);
+  }
+}
+
 function startCompanionLoop() {
   stopCompanionLoop();
   console.log(`[companion] Starting loop (interval: ${companionIntervalMs / 1000}s)`);
@@ -649,6 +668,7 @@ function createTray() {
         } else {
           stopCompanionLoop();
         }
+        broadcastCompanionState();
       },
     },
     {
