@@ -1,10 +1,255 @@
 # Hermes WebUI
 
+深色桌面风格的 WebUI 与 Electron 外壳，为 Hermes Agent 提供实时聊天、工具调用流式展示、VRM 数字人、屏幕感知陪伴模式和 Spotlight 风格的快捷助手。
+
 A dark, desktop-style WebUI and Electron shell for Hermes Agent, with live chat, tool-call streaming, a VRM digital human, screen-aware companion mode, and a Spotlight-style quick assistant.
 
 ![Hermes WebUI Screenshot](./Hermes-nyx.jpg)
 
-[English](#english) | [中文](#中文)
+[中文](#中文) | [English](#english)
+
+---
+
+<a id="中文"></a>
+
+## 功能特性
+
+- **流式聊天 UI** — 基于 WebSocket，支持工具调用展示、结果预览和耗时统计
+- **持久化聊天会话** — 支持会话切换和历史恢复
+- **待办面板** — 基于 JSON 存储，与 Agent 共享任务状态
+- **系统状态栏** — 显示模型名称、CPU、内存、运行时和 Hermes 版本
+- **实时日志面板** — 基于 WebSocket 的日志流
+- **VRM 数字人插件** — 响应聊天中的隐藏指令（如 `[expr:{...}]`）
+- **桌面悬浮陪伴窗口** — 可拖拽的透明头像窗口
+- **Spotlight 快捷输入** — 流式回答，支持屏幕上下文问答
+- **陪伴分析 API** — 截图分析、间隔控制、自动创建待办
+
+## 环境要求
+
+### 系统要求
+
+| 依赖 | 版本 |
+|------|------|
+| macOS | 12+（其他平台可能需要额外适配） |
+| Python | 3.11+ |
+| Node.js | 20+ |
+| npm | 10+ |
+| Git | 2.x |
+
+### Hermes 运行时（必需）
+
+本项目依赖本地安装的 Hermes Agent。运行前请确保以下路径存在：
+
+```text
+~/.hermes/hermes-agent    # Hermes Agent 运行时代码
+~/.hermes/config.yaml     # Hermes 配置文件
+~/.hermes/state.db        # 会话状态数据库
+~/.hermes/logs/           # 日志目录
+```
+
+后端导入的 Hermes 模块：`run_agent.AIAgent`、`hermes_state.SessionDB`、`tools.todo_tool.TodoStore`。
+
+可通过环境变量 `HERMES_HOME` 覆盖 Hermes 主目录（默认：`~/.hermes`）。
+
+## 快速开始（开发模式）
+
+### 1. 克隆仓库
+
+```bash
+git clone https://github.com/user/hermes-webui.git
+cd hermes-webui
+```
+
+### 2. 一键环境初始化
+
+```bash
+bash init.sh
+```
+
+该脚本会自动创建 Python 虚拟环境、安装所有后端/前端/Electron 依赖并构建前端。
+
+### 3. 启动开发服务
+
+```bash
+bash start.sh
+```
+
+启动后：
+
+| 服务 | 地址 |
+|------|------|
+| 前端 (Vite) | http://localhost:5173 |
+| 后端 (FastAPI) | http://localhost:8081 |
+| API 文档 (Swagger) | http://localhost:8081/docs |
+
+按 `Ctrl+C` 停止所有服务。
+
+### 手动安装（备选方案）
+
+```bash
+# 后端
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8081
+
+# 前端（另开终端）
+cd frontend
+npm install
+npm run dev
+```
+
+## 运行 Electron 桌面应用
+
+### 开发模式
+
+```bash
+# 1. 构建前端
+cd frontend
+npm install
+npm run build
+
+# 2. 启动 Electron
+cd ../electron
+npm install
+npm start
+```
+
+Electron 会自动：
+- 启动 Python 后端进程
+- 通过 `HERMES_FRONTEND_DIST` 加载构建好的前端
+- 打开主窗口、悬浮陪伴窗口和 Spotlight 窗口
+
+### 环境变量
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `HERMES_HOME` | Hermes 安装目录 | `~/.hermes` |
+| `HERMES_FRONTEND_DIST` | 前端构建产物路径 | （由 Electron 设置） |
+| `HERMES_MODEL_OPTIONS` | 逗号分隔的模型列表 | （来自 config.yaml） |
+
+## 打包与分发
+
+### 构建 macOS DMG
+
+```bash
+cd electron
+npm run build
+```
+
+使用 `electron-builder` 生成 `.dmg` 安装包和解压目录。
+
+构建配置（`electron/package.json`）：
+
+- **App ID**: `com.hermes.desktop`
+- **产品名**: Hermes
+- **目标格式**: `dmg`、`dir`
+- **打包资源**: 后端代码（排除 venv/pycache）+ 前端构建产物
+
+### 仅构建目录（不生成 DMG）
+
+```bash
+cd electron
+npm run build:dir
+```
+
+在 `electron/dist/mac-arm64/`（或对应架构目录）下生成应用，适合测试使用。
+
+### 构建前准备
+
+打包前请确保：
+
+1. 前端已构建：`cd frontend && npm run build`
+2. 后端依赖已安装（会被打包进应用）
+3. `electron/icons/icon.icns` 存在（macOS 应用图标）
+
+### 打包内容
+
+```text
+electron/
+  main.js           # Electron 入口
+  preload.js        # IPC 桥接
+  icons/            # 应用图标
+  + extraResources:
+    backend/        # 完整后端代码（不含 .venv、__pycache__）
+    frontend-dist/  # 前端构建产物（SPA）
+```
+
+> 注意：Python 运行时本身不会被打包。目标机器需要安装 Python 3.11+。如需完全独立分发，可考虑使用 PyInstaller 打包 Python 或使用 `python-build-standalone`。
+
+## 测试
+
+```bash
+# 后端测试
+cd backend
+source .venv/bin/activate
+pytest
+
+# 前端构建检查与测试
+cd frontend
+npm run build
+npx vitest run
+```
+
+## API 概览
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/health` | GET | 健康检查 |
+| `/api/chat/history` | GET | 聊天历史 |
+| `/api/chat/sessions` | GET | 会话列表 |
+| `/api/chat/sessions/new` | POST | 创建新会话 |
+| `/api/chat/sessions/{id}/switch` | POST | 切换会话 |
+| `/api/chat/quick` | POST | 流式 SSE 响应（Spotlight） |
+| `/ws/chat` | WS | 聊天 WebSocket |
+| `/api/system/info` | GET | 系统信息 |
+| `/api/todos` | GET/POST | 待办增删查 |
+| `/api/todos/{id}` | PATCH/DELETE | 更新/删除待办 |
+| `/api/todos/reorder` | POST | 待办排序 |
+| `/api/companion/analyze` | POST | 截图分析 |
+| `/api/companion/ask` | POST | 屏幕提问 |
+| `/api/companion/status` | GET | 陪伴状态 |
+| `/api/companion/toggle` | POST | 切换陪伴模式 |
+| `/api/companion/history` | GET | 分析历史 |
+| `/api/companion/interval` | POST | 设置分析间隔 |
+| `/ws/logs` | WS | 日志流 |
+
+## 项目结构
+
+```text
+.
+├── backend/
+│   ├── main.py                 # FastAPI 应用与 API 路由
+│   ├── chat_manager.py         # Hermes Agent 桥接 + 会话/待办持久化
+│   ├── config.py               # 配置与 Hermes 路径
+│   ├── companion.py            # 截图/分析辅助
+│   ├── log_monitor.py          # 原始 + 摘要日志流
+│   ├── system_info.py          # 机器/模型/运行时元数据
+│   ├── todo_store.py           # REST 待办辅助
+│   ├── plugins/
+│   │   └── vrm_digital_human.py
+│   ├── requirements.txt
+│   └── tests/
+├── frontend/
+│   ├── src/App.tsx             # 主桌面工作区
+│   ├── src/companion/          # 透明悬浮头像 UI
+│   ├── src/spotlight/          # Spotlight 快捷启动器 UI
+│   ├── src/components/
+│   ├── src/hooks/
+│   └── src/plugins/vrm-digital-human/
+├── electron/
+│   ├── main.js                 # 应用启动、后端生命周期、窗口管理
+│   ├── preload.js              # 安全 IPC 桥接
+│   └── package.json            # Electron + electron-builder 配置
+├── init.sh                     # 一键环境初始化脚本
+├── start.sh                    # 开发启动脚本
+└── features.json               # 功能追踪元数据
+```
+
+## 许可证
+
+GPL-3.0 — 详见 [LICENSE](./LICENSE)。
 
 ---
 
@@ -284,250 +529,3 @@ npx vitest run
 ## License
 
 GPL-3.0 — see [LICENSE](./LICENSE).
-
----
-
-<a id="中文"></a>
-
-# Hermes WebUI 中文文档
-
-深色桌面风格的 WebUI 与 Electron 外壳，为 Hermes Agent 提供实时聊天、工具调用流式展示、VRM 数字人、屏幕感知陪伴模式和 Spotlight 风格的快捷助手。
-
-## 功能特性
-
-- **流式聊天 UI** — 基于 WebSocket，支持工具调用展示、结果预览和耗时统计
-- **持久化聊天会话** — 支持会话切换和历史恢复
-- **待办面板** — 基于 JSON 存储，与 Agent 共享任务状态
-- **系统状态栏** — 显示模型名称、CPU、内存、运行时和 Hermes 版本
-- **实时日志面板** — 基于 WebSocket 的日志流
-- **VRM 数字人插件** — 响应聊天中的隐藏指令（如 `[expr:{...}]`）
-- **桌面悬浮陪伴窗口** — 可拖拽的透明头像窗口
-- **Spotlight 快捷输入** — 流式回答，支持屏幕上下文问答
-- **陪伴分析 API** — 截图分析、间隔控制、自动创建待办
-
-## 环境要求
-
-### 系统要求
-
-| 依赖 | 版本 |
-|------|------|
-| macOS | 12+（其他平台可能需要额外适配） |
-| Python | 3.11+ |
-| Node.js | 20+ |
-| npm | 10+ |
-| Git | 2.x |
-
-### Hermes 运行时（必需）
-
-本项目依赖本地安装的 Hermes Agent。运行前请确保以下路径存在：
-
-```text
-~/.hermes/hermes-agent    # Hermes Agent 运行时代码
-~/.hermes/config.yaml     # Hermes 配置文件
-~/.hermes/state.db        # 会话状态数据库
-~/.hermes/logs/           # 日志目录
-```
-
-后端导入的 Hermes 模块：`run_agent.AIAgent`、`hermes_state.SessionDB`、`tools.todo_tool.TodoStore`。
-
-可通过环境变量 `HERMES_HOME` 覆盖 Hermes 主目录（默认：`~/.hermes`）。
-
-## 快速开始（开发模式）
-
-### 1. 克隆仓库
-
-```bash
-git clone https://github.com/user/hermes-webui.git
-cd hermes-webui
-```
-
-### 2. 一键环境初始化
-
-```bash
-bash init.sh
-```
-
-该脚本会自动创建 Python 虚拟环境、安装所有后端/前端/Electron 依赖并构建前端。
-
-### 3. 启动开发服务
-
-```bash
-bash start.sh
-```
-
-启动后：
-
-| 服务 | 地址 |
-|------|------|
-| 前端 (Vite) | http://localhost:5173 |
-| 后端 (FastAPI) | http://localhost:8081 |
-| API 文档 (Swagger) | http://localhost:8081/docs |
-
-按 `Ctrl+C` 停止所有服务。
-
-### 手动安装（备选方案）
-
-```bash
-# 后端
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8081
-
-# 前端（另开终端）
-cd frontend
-npm install
-npm run dev
-```
-
-## 运行 Electron 桌面应用
-
-### 开发模式
-
-```bash
-# 1. 构建前端
-cd frontend
-npm install
-npm run build
-
-# 2. 启动 Electron
-cd ../electron
-npm install
-npm start
-```
-
-Electron 会自动：
-- 启动 Python 后端进程
-- 通过 `HERMES_FRONTEND_DIST` 加载构建好的前端
-- 打开主窗口、悬浮陪伴窗口和 Spotlight 窗口
-
-### 环境变量
-
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `HERMES_HOME` | Hermes 安装目录 | `~/.hermes` |
-| `HERMES_FRONTEND_DIST` | 前端构建产物路径 | （由 Electron 设置） |
-| `HERMES_MODEL_OPTIONS` | 逗号分隔的模型列表 | （来自 config.yaml） |
-
-## 打包与分发
-
-### 构建 macOS DMG
-
-```bash
-cd electron
-npm run build
-```
-
-使用 `electron-builder` 生成 `.dmg` 安装包和解压目录。
-
-构建配置（`electron/package.json`）：
-
-- **App ID**: `com.hermes.desktop`
-- **产品名**: Hermes
-- **目标格式**: `dmg`、`dir`
-- **打包资源**: 后端代码（排除 venv/pycache）+ 前端构建产物
-
-### 仅构建目录（不生成 DMG）
-
-```bash
-cd electron
-npm run build:dir
-```
-
-在 `electron/dist/mac-arm64/`（或对应架构目录）下生成应用，适合测试使用。
-
-### 构建前准备
-
-打包前请确保：
-
-1. 前端已构建：`cd frontend && npm run build`
-2. 后端依赖已安装（会被打包进应用）
-3. `electron/icons/icon.icns` 存在（macOS 应用图标）
-
-### 打包内容
-
-```text
-electron/
-  main.js           # Electron 入口
-  preload.js        # IPC 桥接
-  icons/            # 应用图标
-  + extraResources:
-    backend/        # 完整后端代码（不含 .venv、__pycache__）
-    frontend-dist/  # 前端构建产物（SPA）
-```
-
-> 注意：Python 运行时本身不会被打包。目标机器需要安装 Python 3.11+。如需完全独立分发，可考虑使用 PyInstaller 打包 Python 或使用 `python-build-standalone`。
-
-## 测试
-
-```bash
-# 后端测试
-cd backend
-source .venv/bin/activate
-pytest
-
-# 前端构建检查与测试
-cd frontend
-npm run build
-npx vitest run
-```
-
-## API 概览
-
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/health` | GET | 健康检查 |
-| `/api/chat/history` | GET | 聊天历史 |
-| `/api/chat/sessions` | GET | 会话列表 |
-| `/api/chat/sessions/new` | POST | 创建新会话 |
-| `/api/chat/sessions/{id}/switch` | POST | 切换会话 |
-| `/api/chat/quick` | POST | 流式 SSE 响应（Spotlight） |
-| `/ws/chat` | WS | 聊天 WebSocket |
-| `/api/system/info` | GET | 系统信息 |
-| `/api/todos` | GET/POST | 待办增删查 |
-| `/api/todos/{id}` | PATCH/DELETE | 更新/删除待办 |
-| `/api/todos/reorder` | POST | 待办排序 |
-| `/api/companion/analyze` | POST | 截图分析 |
-| `/api/companion/ask` | POST | 屏幕提问 |
-| `/api/companion/status` | GET | 陪伴状态 |
-| `/api/companion/toggle` | POST | 切换陪伴模式 |
-| `/api/companion/history` | GET | 分析历史 |
-| `/api/companion/interval` | POST | 设置分析间隔 |
-| `/ws/logs` | WS | 日志流 |
-
-## 项目结构
-
-```text
-.
-├── backend/
-│   ├── main.py                 # FastAPI 应用与 API 路由
-│   ├── chat_manager.py         # Hermes Agent 桥接 + 会话/待办持久化
-│   ├── config.py               # 配置与 Hermes 路径
-│   ├── companion.py            # 截图/分析辅助
-│   ├── log_monitor.py          # 原始 + 摘要日志流
-│   ├── system_info.py          # 机器/模型/运行时元数据
-│   ├── todo_store.py           # REST 待办辅助
-│   ├── plugins/
-│   │   └── vrm_digital_human.py
-│   ├── requirements.txt
-│   └── tests/
-├── frontend/
-│   ├── src/App.tsx             # 主桌面工作区
-│   ├── src/companion/          # 透明悬浮头像 UI
-│   ├── src/spotlight/          # Spotlight 快捷启动器 UI
-│   ├── src/components/
-│   ├── src/hooks/
-│   └── src/plugins/vrm-digital-human/
-├── electron/
-│   ├── main.js                 # 应用启动、后端生命周期、窗口管理
-│   ├── preload.js              # 安全 IPC 桥接
-│   └── package.json            # Electron + electron-builder 配置
-├── init.sh                     # 一键环境初始化脚本
-├── start.sh                    # 开发启动脚本
-└── features.json               # 功能追踪元数据
-```
-
-## 许可证
-
-GPL-3.0 — 详见 [LICENSE](./LICENSE)。
