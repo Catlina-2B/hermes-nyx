@@ -7,7 +7,7 @@ HERMES_AGENT_DIR = os.path.expanduser("~/.hermes/hermes-agent")
 if HERMES_AGENT_DIR not in sys.path:
     sys.path.insert(0, HERMES_AGENT_DIR)
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -17,6 +17,7 @@ from pathlib import Path
 from chat_manager import ChatManager
 from log_monitor import LogMonitor
 from system_info import get_system_info
+from config import load_hermes_config, get_model_options
 import todo_store
 
 app = FastAPI(title="Hermes WebUI")
@@ -111,6 +112,33 @@ async def reorder_todos(body: TodoReorder):
 
 class QuickChatRequest(BaseModel):
     content: str
+
+
+class ModelUpdate(BaseModel):
+    model: str
+
+
+@app.get("/api/models")
+async def get_models():
+    config = load_hermes_config()
+    current = config.get("model", {}).get("default", "")
+    return {
+        "current": current,
+        "options": get_model_options(config),
+    }
+
+
+@app.post("/api/models")
+async def set_model(body: ModelUpdate):
+    model = body.model.strip()
+    if not model:
+        raise HTTPException(status_code=400, detail="model is required")
+    chat_manager.set_model(model)
+    config = load_hermes_config()
+    return {
+        "current": model,
+        "options": get_model_options(config),
+    }
 
 
 from fastapi.responses import StreamingResponse

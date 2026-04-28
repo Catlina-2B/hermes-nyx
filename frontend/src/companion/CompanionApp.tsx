@@ -1,5 +1,9 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import DigitalHumanPanel from "../plugins/vrm-digital-human/DigitalHumanPanel";
+import {
+  AVATAR_MODEL_STORAGE_KEY,
+  normalizeAvatarModelPath,
+} from "../plugins/vrm-digital-human/model-options";
 import type { ChatDirectiveHandler } from "../plugins/types";
 
 interface BubbleMessage {
@@ -12,11 +16,28 @@ let msgId = 0;
 export default function CompanionApp() {
   const chatDirectiveRef = useRef<ChatDirectiveHandler | null>(null);
   const [bubble, setBubble] = useState<BubbleMessage | null>(null);
+  const [avatarModelPath, setAvatarModelPath] = useState(() => {
+    try {
+      return normalizeAvatarModelPath(localStorage.getItem(AVATAR_MODEL_STORAGE_KEY));
+    } catch {
+      return normalizeAvatarModelPath(null);
+    }
+  });
 
   // Override global.css body background for transparent window
   useEffect(() => {
     document.body.style.background = "transparent";
     document.documentElement.style.background = "transparent";
+  }, []);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === AVATAR_MODEL_STORAGE_KEY) {
+        setAvatarModelPath(normalizeAvatarModelPath(event.newValue));
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   // Listen for companion messages from Electron main process
@@ -107,7 +128,11 @@ export default function CompanionApp() {
 
       {/* VRM Character */}
       <div className="absolute inset-0 z-10">
-        <DigitalHumanPanel expressionCallbackRef={chatDirectiveRef} showRoom={false} />
+        <DigitalHumanPanel
+          expressionCallbackRef={chatDirectiveRef}
+          modelPath={avatarModelPath}
+          showRoom={false}
+        />
       </div>
 
       {/* Speech Bubble — compact, max 3 lines, at top */}

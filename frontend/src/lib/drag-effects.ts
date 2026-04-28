@@ -176,6 +176,7 @@ export class DragEffectsEngine {
 
     for (let i = this.trail.length - 1; i >= 0; i--) {
       const p = this.trail[i];
+      if (!p) continue;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.vx *= 0.96;
@@ -194,6 +195,7 @@ export class DragEffectsEngine {
 
     for (let i = this.shockwaves.length - 1; i >= 0; i--) {
       const sw = this.shockwaves[i];
+      if (!sw) continue;
       sw.radius += sw.maxRadius * dt * 2.5;
       sw.life -= dt * 2;
       if (sw.life <= 0) {
@@ -260,18 +262,21 @@ export class DragEffectsEngine {
     const cornerLen = 12;
     ctx.strokeStyle = `rgba(${GREEN},${0.7 * a})`;
     ctx.lineWidth = 2;
-    const corners = [
+    const corners: Array<[number, number]> = [
       [rect.left, rect.top],
       [rect.right, rect.top],
       [rect.right, rect.bottom],
       [rect.left, rect.bottom],
     ];
-    const dirs = [
+    const dirs: Array<[number, number]> = [
       [1, 1], [-1, 1], [-1, -1], [1, -1],
     ];
     for (let i = 0; i < 4; i++) {
-      const [cx, cy] = corners[i];
-      const [dx, dy] = dirs[i];
+      const corner = corners[i];
+      const dir = dirs[i];
+      if (!corner || !dir) continue;
+      const [cx, cy] = corner;
+      const [dx, dy] = dir;
       ctx.beginPath();
       ctx.moveTo(cx, cy + dy * cornerLen);
       ctx.lineTo(cx, cy);

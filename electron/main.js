@@ -443,7 +443,7 @@ async function captureAndAnalyze() {
   // Show thinking pose while analyzing
   if (companionWindow) {
     companionWindow.webContents.send("companion:message", {
-      directive: { pose: "thinking" },
+      directive: { animation: "thinking" },
     });
   }
 
@@ -479,7 +479,7 @@ async function captureAndAnalyze() {
       const moodMap = {
         happy:     { pose: "wave", happy: 0.8 },
         curious:   { pose: "cute_tilt", relaxed: 0.5 },
-        concerned: { pose: "thinking", sad: 0.3 },
+        concerned: { animation: "thinking", sad: 0.3 },
         neutral:   { pose: "hands_behind", relaxed: 0.3 },
       };
 

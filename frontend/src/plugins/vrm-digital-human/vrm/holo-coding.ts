@@ -114,7 +114,7 @@ export class HoloCoding {
       depthTest: false,
     });
     this.keyboard = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.23), kbMat);
-    this.keyboard.position.set(0, 0.84, 0.38);
+    this.keyboard.position.set(0, 0.58, 0.38);
     this.keyboard.rotation.x = -0.42;
     this.keyboard.renderOrder = 3000;
     this.keyboard.visible = false;
@@ -136,7 +136,7 @@ export class HoloCoding {
       depthTest: false,
     });
     this.screen = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 0.5), scrMat);
-    this.screen.position.set(0, 1.42, 0.43);
+    this.screen.position.set(0, 0.96, 0.43);
     this.screen.rotation.x = -0.1;
     this.screen.renderOrder = 3001;
     this.screen.visible = false;

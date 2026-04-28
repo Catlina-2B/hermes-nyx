@@ -168,8 +168,9 @@ export function useChat(chatDirectiveRef?: MutableRefObject<ChatDirectiveHandler
     pendingRef.current = { rawContent: "", content: "", tools: [], appliedDirectives: 0 };
     setMessages((prev) => [...prev, { role: "user", content }]);
     setStreaming(true);
+    chatDirectiveRef?.current?.({ animation: "thinking" });
     wsRef.current?.send({ type: "send", content });
-  }, []);
+  }, [chatDirectiveRef]);
 
   const interrupt = useCallback(() => {
     wsRef.current?.send({ type: "interrupt" });

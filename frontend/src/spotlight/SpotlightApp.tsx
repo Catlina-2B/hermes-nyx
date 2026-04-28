@@ -3,11 +3,6 @@ import { parseChatDirectives } from "../plugins/chatDirectives";
 
 const BACKEND_URL = "http://localhost:8081";
 
-interface ChatResponse {
-  role: string;
-  content: string;
-}
-
 export default function SpotlightApp() {
   const [input, setInput] = useState("");
   const [reply, setReply] = useState("");
@@ -60,6 +55,7 @@ export default function SpotlightApp() {
 
     // Notify main process to resize window
     (window as any).hermesDesktop?.spotlightExpand?.();
+    (window as any).hermesDesktop?.sendToCompanion?.({ animation: "thinking" });
 
     // If asking about screen → capture and ask with context
     if (isScreenQuestion(text)) {

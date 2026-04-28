@@ -16,7 +16,7 @@ if HERMES_AGENT_DIR not in sys.path:
 if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
 
-from config import load_hermes_config, DATA_DIR
+from config import load_hermes_config, set_model_name, DATA_DIR
 from hermes_state import SessionDB
 from tools.todo_tool import TodoStore
 from plugins.vrm_digital_human import VRM_DIGITAL_HUMAN_PROMPT
@@ -306,6 +306,14 @@ class ChatManager:
     def interrupt(self) -> None:
         if self._agent is not None:
             self._agent.interrupt()
+
+    def set_model(self, model: str) -> str:
+        """Switch the default model for future chat turns."""
+        set_model_name(model)
+        if self._agent is not None:
+            self._agent.interrupt()
+        self._agent = None
+        return model
 
     def reset_session(self) -> str:
         self._agent = None

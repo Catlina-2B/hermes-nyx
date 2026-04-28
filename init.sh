@@ -12,11 +12,11 @@ echo "=== Hermes Desktop Companion — Environment Setup ==="
 # 1. Python Backend
 echo ""
 echo "[1/4] Setting up Python backend..."
-if [ ! -d "backend/.venv" ]; then
+if [ ! -d "backend/venv" ]; then
     echo "  Creating venv..."
-    python3 -m venv backend/.venv
+    python3 -m venv backend/venv
 fi
-source backend/.venv/bin/activate
+source backend/venv/bin/activate
 pip install -q -r backend/requirements.txt
 deactivate
 echo "  ✓ Python backend ready"
@@ -78,5 +78,4 @@ print(f\"\n  Progress: {done}/{total} features complete\")
 
 echo ""
 echo "=== Ready! ==="
-echo "  Read PROGRESS.md for current status and next steps."
 echo "  To start dev servers: bash start.sh"

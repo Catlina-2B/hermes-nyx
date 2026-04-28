@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import * as THREE from "three";
 import type { VRM } from "@pixiv/three-vrm";
@@ -7,6 +7,7 @@ import { VRMRenderer } from "./vrm/renderer";
 import { applyParamsToVRM, updateVRMFromTargets } from "./vrm/expression-map";
 import { applyPosePreset, getPoseTargets } from "./vrm/poses";
 import { HoloCoding } from "./vrm/holo-coding";
+import { loadFBXAnimationClipForVRM } from "./vrm/source-animation";
 
 export type ExpressionCallback = (params: Record<string, unknown>) => void;
 
@@ -19,14 +20,40 @@ interface MotionBeat {
 interface Props {
   expressionCallbackRef: MutableRefObject<ExpressionCallback | null>;
   modelPath?: string;
+  danceAnimationPath?: string;
   /** Hide room background decorations (for transparent desktop companion) */
   showRoom?: boolean;
 }
 
 const DEFAULT_POSE = "hands_behind";
-const PLUGIN_VERSION = "vrm-digital-human-2026-04-26-coding-low-typing-v2";
+const DEFAULT_DANCE_ANIMATION_PATH = "/animations/fbx/Arms Hip Hop Dance.fbx";
+const DANCE_ANIMATION_PATHS = [
+  "/animations/fbx/Arms Hip Hop Dance.fbx",
+  "/animations/fbx/dance-2.fbx",
+] as const;
+const THINKING_ANIMATION_PATH = "/animations/fbx/Thinking.fbx";
+const CODING_ANIMATION_PATH = "/animations/fbx/Sitting Idle.fbx";
+const PLUGIN_VERSION = "vrm-digital-human-2026-04-28-fbx-animation-v2";
 const POSE_HOLD_MS = 2600;
 const CODING_HOLD_MS = 9000;
+const ANIMATION_HOLD_MS = 9000;
+const FBX_ANIMATION_ALIASES: Record<string, string> = {
+  angry: "/animations/fbx/Angry.fbx",
+  arms_hip_hop_dance: "/animations/fbx/Arms Hip Hop Dance.fbx",
+  arms_dance: "/animations/fbx/Arms Hip Hop Dance.fbx",
+  bye: "/animations/fbx/Standing Greeting.fbx",
+  byebye: "/animations/fbx/Standing Greeting.fbx",
+  coding: CODING_ANIMATION_PATH,
+  dance_2: "/animations/fbx/dance-2.fbx",
+  female_standing_pose: "/animations/fbx/Female Standing Pose.fbx",
+  goodbye: "/animations/fbx/Standing Greeting.fbx",
+  greeting: "/animations/fbx/Standing Greeting.fbx",
+  sitting_idle: "/animations/fbx/Sitting Idle.fbx",
+  snake_hip_hop_dance: "/animations/fbx/Snake Hip Hop Dance.fbx",
+  standing_greeting: "/animations/fbx/Standing Greeting.fbx",
+  thinking: THINKING_ANIMATION_PATH,
+  wave: "/animations/fbx/Standing Greeting.fbx",
+};
 const POSE_BONE_TARGET_KEYS = new Set([
   "head_x", "head_y", "head_z",
   "neck_x", "neck_y", "neck_z",
@@ -42,6 +69,7 @@ const POSE_BONE_TARGET_KEYS = new Set([
 export default function DigitalHumanPanel({
   expressionCallbackRef,
   modelPath = "/models/yueyue.vrm",
+  danceAnimationPath = DEFAULT_DANCE_ANIMATION_PATH,
   showRoom = true,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -54,6 +82,14 @@ export default function DigitalHumanPanel({
   const activePoseRef = useRef<string | null>(null);
   const motionTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const restoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fbxAnimationRef = useRef<{
+    url: string;
+    mixer: THREE.AnimationMixer;
+    action: THREE.AnimationAction;
+    clip: THREE.AnimationClip;
+    active: boolean;
+  } | null>(null);
+  const fbxAnimationLoadingRef = useRef<Promise<void> | null>(null);
   const blinkTimerRef = useRef(0);
   const nextBlinkRef = useRef(3);
   const elapsedRef = useRef(0);
@@ -61,6 +97,59 @@ export default function DigitalHumanPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastExpr, setLastExpr] = useState("");
+
+  const stopFBXAnimation = useCallback((): void => {
+    const player = fbxAnimationRef.current;
+    if (!player) return;
+    player.active = false;
+    player.action.stop();
+  }, []);
+
+  const startFBXAnimation = useCallback((rawUrl?: string, holdMs = ANIMATION_HOLD_MS, showCodingHolo = false): void => {
+    const vrm = rendererRef.current?.getVRM();
+    if (!vrm) return;
+
+    const url = rawUrl || danceAnimationPath;
+    clearMotionTimers();
+    clearRestoreTimer();
+    aiTargetsRef.current.clear();
+    aiCurrentRef.current.clear();
+    holoCodingRef.current?.setVisible(showCodingHolo);
+    if (showCodingHolo) codingTimerRef.current = 0;
+    activePoseRef.current = "fbx";
+    poseTargetsRef.current = new Map();
+
+    const current = fbxAnimationRef.current;
+    if (current?.url === url) {
+      current.active = true;
+      current.action.reset().play();
+      holoCodingRef.current?.setVisible(showCodingHolo);
+      scheduleDefaultPoseRestore(holdMs);
+      return;
+    }
+
+    stopFBXAnimation();
+    if (fbxAnimationLoadingRef.current) return;
+
+    fbxAnimationLoadingRef.current = loadFBXAnimationClipForVRM(vrm, encodeURI(url))
+      .then((clip) => {
+        const mixer = new THREE.AnimationMixer(vrm.scene);
+        const action = mixer.clipAction(clip);
+        action.setLoop(THREE.LoopRepeat, Infinity);
+        action.clampWhenFinished = false;
+        fbxAnimationRef.current = { url, mixer, action, clip, active: true };
+        holoCodingRef.current?.setVisible(showCodingHolo);
+        action.reset().play();
+        scheduleDefaultPoseRestore(holdMs);
+      })
+      .catch((err) => {
+        console.error("FBX animation failed to load:", err);
+        restoreDefaultPose();
+      })
+      .finally(() => {
+        fbxAnimationLoadingRef.current = null;
+      });
+  }, [danceAnimationPath, stopFBXAnimation]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -79,6 +168,18 @@ export default function DigitalHumanPanel({
       elapsedRef.current += delta;
       blinkTimerRef.current += delta;
       updateBlink(vrm);
+
+      const fbxPlayer = fbxAnimationRef.current;
+      if (fbxPlayer?.active) {
+        updateVRMFromTargets(vrm, aiTargetsRef.current, aiCurrentRef.current, delta, 0.08);
+        fbxPlayer.mixer.update(delta);
+        if (holoCodingRef.current?.visible) {
+          codingTimerRef.current += delta;
+          holoCodingRef.current.update(delta);
+        }
+        return;
+      }
+
       if (activePoseRef.current) clearPoseBoneTargets();
       updateVRMFromTargets(vrm, aiTargetsRef.current, aiCurrentRef.current, delta, 0.08);
       updatePose(vrm, delta);
@@ -124,13 +225,16 @@ export default function DigitalHumanPanel({
       ro.disconnect();
       clearMotionTimers();
       clearRestoreTimer();
+      stopFBXAnimation();
+      fbxAnimationRef.current = null;
+      fbxAnimationLoadingRef.current = null;
       holoCodingRef.current?.dispose();
       holoCodingRef.current = null;
       unregisterDebugApi();
       renderer.dispose();
       rendererRef.current = null;
     };
-  }, [modelPath]);
+  }, [modelPath, stopFBXAnimation]);
 
   useEffect(() => {
     expressionCallbackRef.current = (params) => {
@@ -144,10 +248,18 @@ export default function DigitalHumanPanel({
   }, [expressionCallbackRef]);
 
   function applySkillParams(params: Record<string, unknown>): void {
+    const animationUrl = resolveAnimationDirective(params);
+    if (animationUrl) startFBXAnimation(animationUrl);
+
     const motion = params.motion ?? params.choreo ?? params.choreography;
-    if (motion) runMotionSequence(motion);
+    if (motion && !animationUrl) runMotionSequence(motion);
 
     const directParams = { ...params };
+    delete directParams.animation;
+    delete directParams.anim;
+    delete directParams.fbx;
+    delete directParams.fbxAnimation;
+    delete directParams.animationUrl;
     delete directParams.motion;
     delete directParams.choreo;
     delete directParams.choreography;
@@ -156,12 +268,74 @@ export default function DigitalHumanPanel({
     setLastExpr(JSON.stringify(params).slice(0, 120));
   }
 
+  function resolveAnimationDirective(params: Record<string, unknown>): string | null {
+    const raw =
+      params.fbx ??
+      params.fbxAnimation ??
+      params.animationUrl ??
+      params.animation ??
+      params.anim;
+
+    if (typeof raw !== "string") return null;
+    const value = raw.trim();
+    if (!value) return null;
+    const alias = normalizeAnimationAlias(value);
+    if (alias === "dance") return randomDanceAnimationPath();
+    if (FBX_ANIMATION_ALIASES[alias]) return FBX_ANIMATION_ALIASES[alias];
+    if (value.includes("/") || value.toLowerCase().endsWith(".fbx")) return value;
+    return `/animations/fbx/${value}.fbx`;
+  }
+
+  function normalizeAnimationAlias(value: string): string {
+    return value
+      .trim()
+      .replace(/\.fbx$/i, "")
+      .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+      .replace(/[\s-]+/g, "_")
+      .toLowerCase();
+  }
+
+  function randomDanceAnimationPath(): string {
+    if (danceAnimationPath !== DEFAULT_DANCE_ANIMATION_PATH) return danceAnimationPath;
+    return DANCE_ANIMATION_PATHS[Math.floor(Math.random() * DANCE_ANIMATION_PATHS.length)] ?? DEFAULT_DANCE_ANIMATION_PATH;
+  }
+
+  function isGreetingPose(poseName: string): boolean {
+    return ["wave", "greeting", "standing_greeting", "bye", "byebye", "goodbye"].includes(poseName);
+  }
+
+  function isDancePose(poseName: string): boolean {
+    return ["dance", "dance_twist_l", "dance_twist_r"].includes(poseName);
+  }
+
   function applyImmediateParams(params: Record<string, unknown>): void {
     const vrm = rendererRef.current?.getVRM();
     if (!vrm) return;
 
     const poseName = applyParamsToVRM(vrm, params, aiTargetsRef.current);
     if (!poseName) return;
+
+    if (poseName === "thinking") {
+      startFBXAnimation(THINKING_ANIMATION_PATH, POSE_HOLD_MS);
+      return;
+    }
+
+    if (poseName === "coding") {
+      startFBXAnimation(CODING_ANIMATION_PATH, CODING_HOLD_MS, true);
+      return;
+    }
+
+    if (isDancePose(poseName)) {
+      startFBXAnimation(randomDanceAnimationPath());
+      return;
+    }
+
+    if (isGreetingPose(poseName)) {
+      startFBXAnimation(FBX_ANIMATION_ALIASES.standing_greeting, POSE_HOLD_MS);
+      return;
+    }
+
+    stopFBXAnimation();
 
     const targets = getPoseTargets(poseName);
     if (targets.size > 0) {
@@ -185,12 +359,17 @@ export default function DigitalHumanPanel({
       info: () => ({
         version: PLUGIN_VERSION,
         activePose: activePoseRef.current,
+        activeAnimation: fbxAnimationRef.current?.active ? fbxAnimationRef.current.url : null,
         modelPath,
         lastExpr,
         bones: readDebugBones(),
       }),
       pose: (pose: string) => {
         applyImmediateParams({ pose });
+        return window.hermesVrmDebug?.info();
+      },
+      animation: (animation?: string) => {
+        startFBXAnimation(animation || randomDanceAnimationPath());
         return window.hermesVrmDebug?.info();
       },
       faceMeshes: () => readFaceMeshes(),
@@ -255,6 +434,12 @@ export default function DigitalHumanPanel({
 
     clearMotionTimers();
     clearRestoreTimer();
+
+    if (isDanceMotion(beats)) {
+      startFBXAnimation(randomDanceAnimationPath());
+      return;
+    }
+
     for (const beat of beats) {
       const timer = setTimeout(() => {
         const params: Record<string, unknown> = { ...(beat.expr ?? {}) };
@@ -302,6 +487,10 @@ export default function DigitalHumanPanel({
       .slice(0, 8);
   }
 
+  function isDanceMotion(beats: MotionBeat[]): boolean {
+    return beats.some((beat) => beat.pose && isDancePose(beat.pose));
+  }
+
   function clearMotionTimers(): void {
     for (const timer of motionTimersRef.current) clearTimeout(timer);
     motionTimersRef.current = [];
@@ -321,6 +510,7 @@ export default function DigitalHumanPanel({
 
   function restoreDefaultPose(): void {
     restoreTimerRef.current = null;
+    stopFBXAnimation();
     aiTargetsRef.current.clear();
     aiCurrentRef.current.clear();
     holoCodingRef.current?.setVisible(false);

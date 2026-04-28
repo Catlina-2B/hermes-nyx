@@ -11,6 +11,11 @@ import TodoPanel from "./components/TodoPanel";
 import CompanionPanel from "./components/CompanionPanel";
 import DragEffectsCanvas, { type DragEffectsHandle } from "./components/DragEffectsCanvas";
 import DigitalHumanPanel from "./plugins/vrm-digital-human/DigitalHumanPanel";
+import {
+  AVATAR_MODEL_OPTIONS,
+  AVATAR_MODEL_STORAGE_KEY,
+  normalizeAvatarModelPath,
+} from "./plugins/vrm-digital-human/model-options";
 import { frontendPlugins } from "./plugins/registry";
 import type { ChatDirectiveHandler } from "./plugins/types";
 
@@ -42,6 +47,13 @@ export default function App() {
   const effectsRef = useRef<DragEffectsHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
+  const [avatarModelPath, setAvatarModelPath] = useState(() => {
+    try {
+      return normalizeAvatarModelPath(localStorage.getItem(AVATAR_MODEL_STORAGE_KEY));
+    } catch {
+      return normalizeAvatarModelPath(null);
+    }
+  });
 
   // Avatar location: "desktop" (companion window) or "webui" (inline)
   // Persisted to localStorage so it survives page refresh
@@ -61,6 +73,14 @@ export default function App() {
       (window as any).hermesDesktop?.switchAvatarTo?.(avatarLocation);
     }
   }, [avatarLocation]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(AVATAR_MODEL_STORAGE_KEY, avatarModelPath);
+    } catch {
+      /* noop */
+    }
+  }, [avatarModelPath]);
 
   // Listen for avatar switch events from Electron
   useEffect(() => {
@@ -120,7 +140,9 @@ export default function App() {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
       setContainerSize({ w: width, h: height });
     });
     ro.observe(el);
@@ -208,7 +230,13 @@ export default function App() {
 
   return (
     <div className="h-screen flex flex-col bg-cyber-bg">
-      <SystemBar chatConnected={chat.connected} />
+      <SystemBar
+        chatConnected={chat.connected}
+        chatStreaming={chat.streaming}
+        avatarModelPath={avatarModelPath}
+        avatarModelOptions={AVATAR_MODEL_OPTIONS}
+        onAvatarModelChange={setAvatarModelPath}
+      />
 
       {/* Fluid layout container */}
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
@@ -291,7 +319,7 @@ export default function App() {
                 ))}
               </div>
             </div>
-            <DigitalHumanPanel expressionCallbackRef={chatDirectiveRef} />
+            <DigitalHumanPanel expressionCallbackRef={chatDirectiveRef} modelPath={avatarModelPath} />
           </div>
         )}
       </div>
