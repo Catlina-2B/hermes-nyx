@@ -2,6 +2,8 @@
 
 A dark, desktop-style WebUI and Electron shell for Hermes Agent, with live chat, tool-call streaming, a VRM digital human, screen-aware companion mode, and a Spotlight-style quick assistant.
 
+![Hermes WebUI Screenshot](./Hermes-nyx.jpg)
+
 [English](#english) | [中文](#中文)
 
 ---
