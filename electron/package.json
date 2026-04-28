@@ -9,7 +9,7 @@
     "build:dir": "electron-builder --dir"
   },
   "author": "Hermes",
-  "license": "MIT",
+  "license": "GPL-3.0",
   "devDependencies": {
     "electron": "^35.0.0",
     "electron-builder": "^26.0.0"

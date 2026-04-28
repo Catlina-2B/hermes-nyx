@@ -281,7 +281,7 @@ npx vitest run
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+GPL-3.0 — see [LICENSE](./LICENSE).
 
 ---
 
@@ -528,4 +528,4 @@ npx vitest run
 
 ## 许可证
 
-MIT — 详见 [LICENSE](./LICENSE)。
+GPL-3.0 — 详见 [LICENSE](./LICENSE)。
