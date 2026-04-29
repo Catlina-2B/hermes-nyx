@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen, globalShortcut } = require("electron");
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen, globalShortcut, dialog, shell } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
 const http = require("http");
@@ -840,6 +840,96 @@ function createTray() {
 }
 
 // ---------------------------------------------------------------------------
+// Check for Updates
+// ---------------------------------------------------------------------------
+
+const APP_VERSION = "0.1.1";
+const GITHUB_REPO = "Catlina-2B/hermes-nyx";
+const INSTALL_CMD = `curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/install.sh | bash`;
+
+async function checkForUpdates(silent = false) {
+  try {
+    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const latest = (data.tag_name || "").replace(/^v/, "");
+
+    if (!latest) {
+      if (!silent) dialog.showMessageBox({ message: "无法获取版本信息", type: "warning" });
+      return;
+    }
+
+    if (latest === APP_VERSION) {
+      if (!silent) {
+        dialog.showMessageBox({
+          type: "info",
+          title: "检查更新",
+          message: `当前已是最新版本 v${APP_VERSION}`,
+        });
+      }
+      return;
+    }
+
+    const releaseNotes = (data.body || "").slice(0, 500);
+    const { response: btn } = await dialog.showMessageBox({
+      type: "info",
+      title: "发现新版本",
+      message: `新版本 v${latest} 可用（当前 v${APP_VERSION}）`,
+      detail: `${releaseNotes}\n\n终端运行以下命令更新：\n${INSTALL_CMD}`,
+      buttons: ["复制安装命令", "打开 GitHub", "稍后再说"],
+      defaultId: 0,
+    });
+
+    if (btn === 0) {
+      const { clipboard } = require("electron");
+      clipboard.writeText(INSTALL_CMD);
+      dialog.showMessageBox({ message: "安装命令已复制到剪贴板，请在终端中粘贴运行", type: "info" });
+    } else if (btn === 1) {
+      shell.openExternal(`https://github.com/${GITHUB_REPO}/releases/latest`);
+    }
+  } catch (err) {
+    console.error("[update] Check failed:", err.message);
+    if (!silent) {
+      dialog.showMessageBox({ message: `检查更新失败: ${err.message}`, type: "error" });
+    }
+  }
+}
+
+function setupAppMenu() {
+  const template = [
+    {
+      label: app.name,
+      submenu: [
+        { label: `关于 ${app.name}`, role: "about" },
+        {
+          label: "检查更新...",
+          click: () => checkForUpdates(false),
+        },
+        { type: "separator" },
+        { label: "服务", role: "services" },
+        { type: "separator" },
+        { label: `隐藏 ${app.name}`, role: "hide" },
+        { label: "隐藏其他", role: "hideOthers" },
+        { label: "显示全部", role: "unhide" },
+        { type: "separator" },
+        { label: `退出 ${app.name}`, role: "quit" },
+      ],
+    },
+    { label: "文件", submenu: [{ role: "close" }] },
+    { label: "编辑", submenu: [
+      { role: "undo" }, { role: "redo" }, { type: "separator" },
+      { role: "cut" }, { role: "copy" }, { role: "paste" }, { role: "selectAll" },
+    ]},
+    { label: "视图", submenu: [
+      { role: "reload" }, { role: "forceReload" }, { role: "toggleDevTools" },
+      { type: "separator" }, { role: "togglefullscreen" },
+    ]},
+    { label: "窗口", submenu: [{ role: "minimize" }, { role: "zoom" }] },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+// ---------------------------------------------------------------------------
 // App Lifecycle — Single Instance Lock
 // ---------------------------------------------------------------------------
 
@@ -893,6 +983,7 @@ app.on("ready", async () => {
     // Continue anyway — user might start backend manually
   }
 
+  setupAppMenu();
   createMainWindow();
   createCompanionWindow();
   createSpotlightWindow();
@@ -900,6 +991,8 @@ app.on("ready", async () => {
   registerGlobalShortcuts();
   createTray();
   startReminderPolling();
+  // Silent update check on launch
+  checkForUpdates(true);
 });
 
 app.on("before-quit", () => {

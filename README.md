@@ -12,6 +12,20 @@ A dark, desktop-style WebUI and Electron shell for Hermes Agent, with live chat,
 
 <a id="中文"></a>
 
+## 安装
+
+### 一键安装（macOS）
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Catlina-2B/hermes-nyx/main/install.sh | bash
+```
+
+自动从 GitHub Releases 下载最新版本并安装到 `/Applications/`。已安装时运行同一命令即可更新。
+
+### 手动安装
+
+从 [Releases](https://github.com/Catlina-2B/hermes-nyx/releases) 下载 DMG，打开后拖入 Applications 文件夹。
+
 ## 功能特性
 
 - **流式聊天 UI** — 基于 WebSocket，支持工具调用展示、结果预览和耗时统计
@@ -254,6 +268,20 @@ GPL-3.0 — 详见 [LICENSE](./LICENSE)。
 ---
 
 <a id="english"></a>
+
+## Installation
+
+### One-line Install (macOS)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Catlina-2B/hermes-nyx/main/install.sh | bash
+```
+
+Automatically downloads the latest release from GitHub and installs to `/Applications/`. Run the same command to update.
+
+### Manual Install
+
+Download the DMG from [Releases](https://github.com/Catlina-2B/hermes-nyx/releases) and drag to Applications.
 
 ## Features
 
