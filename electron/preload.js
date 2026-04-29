@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld("hermesDesktop", {
   captureNow: () => ipcRenderer.send("companion:capture-now"),
   sendToCompanion: (directive) => ipcRenderer.send("companion:send-directive", directive),
   setCompanionInterval: (minutes) => ipcRenderer.send("companion:set-interval", minutes),
+  // Toggle click-through on transparent regions of the companion window
+  setCompanionMousePassthrough: (ignore) =>
+    ipcRenderer.send("companion:set-mouse-passthrough", !!ignore),
   onCompanionMessage: (callback) => {
     ipcRenderer.on("companion:message", (_event, data) => callback(data));
   },

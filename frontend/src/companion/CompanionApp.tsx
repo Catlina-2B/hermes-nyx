@@ -97,6 +97,88 @@ export default function CompanionApp() {
     });
   }, []);
 
+  // Click-through on transparent regions. The character is rendered to a
+  // WebGL canvas, so we sample the alpha at the cursor position and toggle
+  // setIgnoreMouseEvents accordingly. Without this the whole 400x500 window
+  // (mostly transparent) acts as a drag handle and the cursor turns into a
+  // grab-hand even when the user is far from the character.
+  useEffect(() => {
+    const ipc = (window as any).hermesDesktop;
+    if (!ipc?.setCompanionMousePassthrough) return;
+
+    let lastIgnore: boolean | null = null;
+    let rafScheduled = false;
+    let pendingEvent: { x: number; y: number } | null = null;
+
+    const setPassthrough = (ignore: boolean) => {
+      if (ignore === lastIgnore) return;
+      lastIgnore = ignore;
+      ipc.setCompanionMousePassthrough(ignore);
+    };
+
+    const sample = () => {
+      rafScheduled = false;
+      const ev = pendingEvent;
+      pendingEvent = null;
+      if (!ev) return;
+
+      // If the cursor is over an interactive HTML element (e.g. the
+      // right-click context menu, speech bubble link), keep mouse capture
+      // on so it can receive clicks. Sampling the canvas behind it would
+      // wrongly turn passthrough on and break the menu.
+      const top = document.elementFromPoint(ev.x, ev.y);
+      if (top && top.closest("[data-companion-interactive]")) {
+        setPassthrough(false);
+        return;
+      }
+
+      const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
+      if (!canvas) {
+        setPassthrough(true);
+        return;
+      }
+      const rect = canvas.getBoundingClientRect();
+      if (
+        ev.x < rect.left || ev.x > rect.right ||
+        ev.y < rect.top || ev.y > rect.bottom
+      ) {
+        setPassthrough(true);
+        return;
+      }
+
+      const px = Math.floor((ev.x - rect.left) * (canvas.width / rect.width));
+      const py = Math.floor((ev.y - rect.top) * (canvas.height / rect.height));
+      const gl = (canvas.getContext("webgl2") || canvas.getContext("webgl")) as
+        | WebGLRenderingContext | WebGL2RenderingContext | null;
+      if (!gl) return;
+      const pixel = new Uint8Array(4);
+      // WebGL Y is bottom-up.
+      gl.readPixels(
+        px, canvas.height - py - 1, 1, 1,
+        gl.RGBA, gl.UNSIGNED_BYTE, pixel,
+      );
+      setPassthrough(pixel[3] === 0);
+    };
+
+    const onMove = (ev: MouseEvent) => {
+      pendingEvent = { x: ev.clientX, y: ev.clientY };
+      if (!rafScheduled) {
+        rafScheduled = true;
+        requestAnimationFrame(sample);
+      }
+    };
+
+    // Default: assume passthrough until we sample. Otherwise the window
+    // would catch a click before the first mousemove.
+    setPassthrough(true);
+    window.addEventListener("mousemove", onMove);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      // Restore mouse capture so dev reloads / next session aren't broken.
+      ipc.setCompanionMousePassthrough(false);
+    };
+  }, []);
+
   // Right-click context menu
   const onContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -105,6 +187,7 @@ export default function CompanionApp() {
 
     const menu = document.createElement("div");
     menu.className = "fixed z-[9999] py-1 rounded-lg border border-cyan-400/20 bg-[#0d1220]/95 backdrop-blur-xl shadow-[0_0_30px_rgba(34,211,238,0.12)] min-w-[160px]";
+    menu.setAttribute("data-companion-interactive", "true");
     menu.style.left = `${e.clientX}px`;
     menu.style.top = `${e.clientY}px`;
 
@@ -155,11 +238,14 @@ export default function CompanionApp() {
 
   return (
     <div className="relative w-full h-full select-none">
-      {/* Drag handle — entire window is draggable + right-click menu */}
+      {/* Drag handle — covers the whole window for hit-testing, but the
+          cursor stays default until the user actually begins dragging.
+          Click-through on transparent areas is handled by the WebGL alpha
+          sampler that toggles setIgnoreMouseEvents in the main process. */}
       <div
         onPointerDown={onDragStart}
         onContextMenu={onContextMenu}
-        className="absolute inset-0 z-40 cursor-grab active:cursor-grabbing"
+        className="absolute inset-0 z-40 active:cursor-grabbing"
       />
 
       {/* VRM Character */}
