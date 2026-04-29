@@ -8,6 +8,8 @@ import uuid
 from pathlib import Path
 from typing import AsyncGenerator
 
+from todo_reminder import extract_deadline
+
 _BACKEND_DIR = str(Path(__file__).parent)
 HERMES_AGENT_DIR = os.path.expanduser("~/.hermes/hermes-agent")
 if HERMES_AGENT_DIR not in sys.path:
@@ -51,9 +53,36 @@ class PersistentTodoStore(TodoStore):
 
     def write(self, todos, merge=False):
         self._load_from_file()  # reload in case WebUI modified it
+        old_ids = {item.get("id") for item in self._items}
         result = super().write(todos, merge)
         self._save_to_file()
+        # Trigger deadline extraction for newly added todos
+        for item in self._items:
+            if item.get("id") not in old_ids and item.get("content"):
+                self._extract_deadline_async(item)
         return result
+
+    def _extract_deadline_async(self, item: dict) -> None:
+        """Fire-and-forget deadline extraction for a new todo item."""
+        import todo_store as ts
+
+        async def _do_extract():
+            try:
+                deadline = await extract_deadline(item.get("content", ""))
+                if deadline:
+                    ts.update_todo(item["id"], deadline=deadline)
+                    print(f"[todo-reminder] Agent todo deadline: {deadline}")
+            except Exception as e:
+                print(f"[todo-reminder] Agent todo extraction failed: {e}")
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(_do_extract())
+            else:
+                asyncio.run(_do_extract())
+        except RuntimeError:
+            pass
 
     def read(self):
         self._load_from_file()
