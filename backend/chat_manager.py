@@ -246,24 +246,14 @@ class ChatManager:
 
         def run_agent():
             try:
-                actual_history = history
                 actual_content = content
                 if isinstance(content, list):
-                    # Multimodal: Agent can't accept list as user_message (string ops crash).
-                    # Strategy: put multimodal content into conversation_history as the
-                    # last user message, then send a short follow-up text as user_message.
-                    # The model sees both the image (from history) and the text prompt.
-                    text_parts = [p["text"] for p in content if p.get("type") == "text"]
-                    actual_content = " ".join(text_parts) or "请描述这张图片"
-                    multimodal_msg = {"role": "user", "content": content}
-                    assistant_ack = {"role": "assistant", "content": "好的，我看到了图片。"}
-                    if actual_history is None:
-                        actual_history = [multimodal_msg, assistant_ack]
-                    else:
-                        actual_history = actual_history + [multimodal_msg, assistant_ack]
+                    # Follow Hermes CLI approach: pre-analyze images via vision tool,
+                    # prepend descriptions to user text as plain string.
+                    actual_content = self._preprocess_images(content)
                 result = self._agent.run_conversation(
                     user_message=actual_content,
-                    conversation_history=actual_history,
+                    conversation_history=history,
                     stream_callback=on_stream_delta,
                 )
                 # After first call with history, agent owns its state
@@ -349,6 +339,69 @@ class ChatManager:
         if store is None:
             return []
         return store.read()
+
+    def _preprocess_images(self, content: list) -> str:
+        """Analyze images via vision tool and return enriched text (same as Hermes CLI)."""
+        import base64
+        import tempfile
+        import asyncio as _asyncio
+        import json as _json
+
+        text_parts = [p["text"] for p in content if p.get("type") == "text"]
+        user_text = " ".join(text_parts) or ""
+
+        enriched_parts = []
+        for part in content:
+            if part.get("type") != "image_url":
+                continue
+            url = part.get("image_url", {}).get("url", "")
+            if not url.startswith("data:"):
+                continue
+            # Save base64 image to temp file
+            b64_data = url.split(",", 1)[-1]
+            img_bytes = base64.b64decode(b64_data)
+            tmp = tempfile.NamedTemporaryFile(suffix=".png", dir=str(Path.home() / ".hermes" / "images"), delete=False)
+            Path(tmp.name).parent.mkdir(parents=True, exist_ok=True)
+            tmp.write(img_bytes)
+            tmp.close()
+            img_path = tmp.name
+
+            try:
+                from tools.vision_tools import vision_analyze_tool
+                analysis_prompt = (
+                    "Describe everything visible in this image in thorough detail. "
+                    "Include any text, code, data, objects, people, layout, colors, "
+                    "and any other notable visual information."
+                )
+                result_json = _asyncio.run(
+                    vision_analyze_tool(image_url=img_path, user_prompt=analysis_prompt)
+                )
+                result = _json.loads(result_json)
+                if result.get("success"):
+                    description = result.get("analysis", "")
+                    enriched_parts.append(
+                        f"[The user attached an image. Here's what it contains:\n{description}]\n"
+                        f"[If you need a closer look, use vision_analyze with "
+                        f"image_url: {img_path}]"
+                    )
+                else:
+                    enriched_parts.append(
+                        f"[The user attached an image but it couldn't be analyzed. "
+                        f"You can try examining it with vision_analyze using "
+                        f"image_url: {img_path}]"
+                    )
+            except Exception as e:
+                enriched_parts.append(
+                    f"[The user attached an image but analysis failed ({e}). "
+                    f"You can try examining it with vision_analyze using "
+                    f"image_url: {img_path}]"
+                )
+                print(f"[chat] Vision analysis error: {e}")
+
+        if enriched_parts:
+            prefix = "\n\n".join(enriched_parts)
+            return f"{prefix}\n\n{user_text}" if user_text else prefix
+        return user_text or "请描述这张图片"
 
     def interrupt(self) -> None:
         if self._agent is not None:
