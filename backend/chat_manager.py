@@ -250,7 +250,15 @@ class ChatManager:
                 if isinstance(content, list):
                     # Follow Hermes CLI approach: pre-analyze images via vision tool,
                     # prepend descriptions to user text as plain string.
-                    actual_content = self._preprocess_images(content)
+                    print("[chat] Processing multimodal content with vision tool...")
+                    try:
+                        actual_content = self._preprocess_images(content)
+                        print(f"[chat] Vision preprocessing done: {actual_content[:100]}...")
+                    except Exception as ve:
+                        print(f"[chat] Vision preprocessing failed: {ve}")
+                        # Fallback: just send the text without image
+                        text_parts = [p["text"] for p in content if p.get("type") == "text"]
+                        actual_content = " ".join(text_parts) or "（图片处理失败）"
                 result = self._agent.run_conversation(
                     user_message=actual_content,
                     conversation_history=history,
@@ -360,8 +368,9 @@ class ChatManager:
             # Save base64 image to temp file
             b64_data = url.split(",", 1)[-1]
             img_bytes = base64.b64decode(b64_data)
-            tmp = tempfile.NamedTemporaryFile(suffix=".png", dir=str(Path.home() / ".hermes" / "images"), delete=False)
-            Path(tmp.name).parent.mkdir(parents=True, exist_ok=True)
+            images_dir = Path.home() / ".hermes" / "images"
+            images_dir.mkdir(parents=True, exist_ok=True)
+            tmp = tempfile.NamedTemporaryFile(suffix=".png", dir=str(images_dir), delete=False)
             tmp.write(img_bytes)
             tmp.close()
             img_path = tmp.name
