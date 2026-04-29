@@ -50,6 +50,12 @@ async def chat_history():
 async def chat_sessions():
     return chat_manager.list_sessions()
 
+
+@app.get("/api/chat/sessions/current")
+async def current_session():
+    return {"session_id": chat_manager.get_current_session_id()}
+
+
 @app.post("/api/chat/sessions/new")
 async def new_session():
     sid = chat_manager.new_session()
@@ -61,6 +67,26 @@ async def switch_session(session_id: str):
     if ok:
         return {"ok": True, "session_id": session_id}
     return {"error": "session not found"}
+
+
+class SessionRename(BaseModel):
+    title: str
+
+
+@app.patch("/api/chat/sessions/{session_id}")
+async def rename_session(session_id: str, body: SessionRename):
+    result = chat_manager.rename_session(session_id, body.title)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "rename failed"))
+    return result
+
+
+@app.delete("/api/chat/sessions/{session_id}")
+async def delete_session(session_id: str):
+    result = chat_manager.delete_session(session_id)
+    if not result.get("ok"):
+        raise HTTPException(status_code=404, detail=result.get("error", "delete failed"))
+    return result
 
 
 # ── REST: System Info ─────────────────────────────────────

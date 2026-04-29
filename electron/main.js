@@ -277,6 +277,12 @@ function createCompanionWindow() {
   companionWindow.loadURL(companionURL);
   companionWindow.setVisibleOnAllWorkspaces(true);
 
+  // Default to click-through so the empty / transparent regions of the
+  // 400x500 window do not intercept clicks meant for whatever is behind
+  // the avatar. The renderer disables passthrough on demand whenever the
+  // cursor enters a non-transparent pixel of the VRM canvas.
+  companionWindow.setIgnoreMouseEvents(true, { forward: true });
+
   companionWindow.on("closed", () => {
     companionWindow = null;
   });
@@ -334,6 +340,14 @@ function setupCompanionIPC() {
   ipcMain.on("companion:capture-now", async () => {
     console.log("[companion] Manual capture requested");
     await captureAndAnalyze();
+  });
+
+  // Click-through on transparent areas. forward:true keeps mousemove
+  // events flowing so the renderer can decide when to disable passthrough
+  // again as the cursor enters a non-transparent region.
+  ipcMain.on("companion:set-mouse-passthrough", (_event, ignore) => {
+    if (!companionWindow) return;
+    companionWindow.setIgnoreMouseEvents(!!ignore, { forward: true });
   });
 
   // Forward directives from any window to companion

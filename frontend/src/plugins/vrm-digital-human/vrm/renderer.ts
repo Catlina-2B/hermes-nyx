@@ -17,6 +17,10 @@ export class VRMRenderer {
       canvas,
       antialias: true,
       alpha: true,
+      // Required so the companion window can sample alpha at the cursor
+      // position via gl.readPixels — without this the read returns zeros
+      // after the frame is presented.
+      preserveDrawingBuffer: true,
     });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;

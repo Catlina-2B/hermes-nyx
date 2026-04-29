@@ -251,10 +251,14 @@ export default function App() {
                 messages={chat.messages}
                 streaming={chat.streaming}
                 sessions={chat.sessions}
+                currentSessionId={chat.currentSessionId}
                 onSend={chat.send}
                 onInterrupt={chat.interrupt}
                 onNewSession={chat.newSession}
                 onSwitchSession={chat.switchSession}
+                onRenameSession={chat.renameSession}
+                onDeleteSession={chat.deleteSession}
+                onOpenSessions={chat.refreshSessions}
               />
             </div>
 
