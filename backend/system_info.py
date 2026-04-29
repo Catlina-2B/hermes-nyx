@@ -28,18 +28,11 @@ def _get_gpu_name() -> str:
         return "N/A"
 
 
+APP_VERSION = "0.1.0"
+
+
 def _get_app_version() -> str:
-    """Get Hermes-nyx WebUI version from package.json."""
-    import json
-    from pathlib import Path
-    for rel in ["../frontend/package.json", "../electron/package.json"]:
-        pkg = Path(__file__).parent / rel
-        if pkg.exists():
-            try:
-                return json.loads(pkg.read_text()).get("version", "unknown")
-            except Exception:
-                continue
-    return "unknown"
+    return APP_VERSION
 
 
 def _get_hermes_version() -> str:
