@@ -8,7 +8,7 @@ HERMES_CONFIG_PATH = HERMES_HOME / "config.yaml"
 HERMES_LOGS_DIR = HERMES_HOME / "logs"
 HERMES_AGENT_LOG = HERMES_LOGS_DIR / "agent.log"
 HERMES_ERRORS_LOG = HERMES_LOGS_DIR / "errors.log"
-DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR = HERMES_HOME / "webui-data"
 
 
 def load_hermes_config() -> dict:
