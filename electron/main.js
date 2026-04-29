@@ -409,6 +409,8 @@ function setupCompanionIPC() {
 // Screen Capture + Companion Loop
 // ---------------------------------------------------------------------------
 
+let screenPermissionDenied = false; // track if user already denied
+
 async function captureScreen() {
   const { systemPreferences } = require("electron");
   const win = mainWindow;
@@ -417,18 +419,22 @@ async function captureScreen() {
     return null;
   }
 
-  // Check screen recording permission before attempting capture
+  // Check screen recording permission
   const screenAccess = systemPreferences.getMediaAccessStatus("screen");
-  if (screenAccess !== "granted") {
-    console.log(`[capture] Screen recording not granted (status: ${screenAccess})`);
-    // Notify user once via companion bubble
-    if (companionWindow) {
-      companionWindow.webContents.send("companion:message", {
-        text: "需要录屏权限才能观察屏幕，请在系统设置 → 隐私与安全性 → 录屏中允许 Hermes",
-      });
+  if (screenAccess === "denied" || screenPermissionDenied) {
+    // User has explicitly denied — don't spam the dialog
+    if (!screenPermissionDenied) {
+      screenPermissionDenied = true;
+      if (companionWindow) {
+        companionWindow.webContents.send("companion:message", {
+          text: "需要录屏权限才能观察屏幕，请在系统设置 → 隐私与安全性 → 录屏中允许 Hermes-nyx",
+        });
+      }
     }
+    console.log("[capture] Screen recording denied, skipping");
     return null;
   }
+  // "not-determined" or "granted" — let the system handle it (will prompt once if needed)
 
   try {
     const base64 = await win.webContents.executeJavaScript(`
@@ -462,6 +468,11 @@ async function captureScreen() {
     }
   } catch (e) {
     console.log("[capture] getDisplayMedia failed:", e.message);
+    // Re-check permission after failure — user may have denied the prompt
+    const postAccess = systemPreferences.getMediaAccessStatus("screen");
+    if (postAccess === "denied") {
+      screenPermissionDenied = true;
+    }
   }
 
   // Fallback: capture the app's own window
