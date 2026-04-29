@@ -28,10 +28,10 @@ def _get_gpu_name() -> str:
         return "N/A"
 
 
-def _get_hermes_version() -> str:
+def _get_app_version() -> str:
+    """Get Hermes-nyx WebUI version from package.json."""
     import json
     from pathlib import Path
-    # Read version from our own frontend/package.json or electron/package.json
     for rel in ["../frontend/package.json", "../electron/package.json"]:
         pkg = Path(__file__).parent / rel
         if pkg.exists():
@@ -42,12 +42,27 @@ def _get_hermes_version() -> str:
     return "unknown"
 
 
+def _get_hermes_version() -> str:
+    """Get Hermes Agent runtime version from pyproject.toml."""
+    pyproject = HERMES_AGENT_DIR / "pyproject.toml"
+    if not pyproject.exists():
+        return "unknown"
+    try:
+        for line in pyproject.read_text().splitlines():
+            if line.strip().startswith("version"):
+                return line.split("=")[-1].strip().strip('"').strip("'")
+    except Exception:
+        pass
+    return "unknown"
+
+
 _static_info = {
     "cpu": platform.processor() or platform.machine(),
     "memory": f"{round(psutil.virtual_memory().total / (1024**3))}GB",
     "disk": f"{round(psutil.disk_usage('/').total / (1024**3))}GB",
     "gpu": _get_gpu_name(),
     "os": f"{platform.system()} {platform.release()}",
+    "app_version": _get_app_version(),
     "hermes_version": _get_hermes_version(),
 }
 

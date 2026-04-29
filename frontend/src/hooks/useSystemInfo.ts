@@ -8,6 +8,7 @@ export interface SystemInfo {
   os: string;
   model: string;
   runtime: string;
+  app_version: string;
   hermes_version: string;
 }
 
