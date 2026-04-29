@@ -105,6 +105,21 @@ async def _extract_and_set_deadline(todo_id: str, content: str):
     except Exception as e:
         print(f"[todo-reminder] Extraction failed: {e}")
 
+@app.get("/api/todos/reminders")
+async def todo_reminders():
+    """Return todos due within 10 minutes that haven't been reminded."""
+    return todo_store.get_pending_reminders(within_minutes=10)
+
+
+@app.post("/api/todos/{todo_id}/reminded")
+async def todo_mark_reminded(todo_id: str):
+    """Mark a todo as reminded."""
+    result = todo_store.mark_reminded(todo_id)
+    if not result:
+        raise HTTPException(404, "Todo not found")
+    return result
+
+
 @app.patch("/api/todos/{todo_id}")
 async def update_todo(todo_id: str, body: TodoUpdate):
     result = todo_store.update_todo(todo_id, body.completed, body.content)
@@ -353,19 +368,6 @@ async def companion_set_interval(minutes: int = 5):
     return {"interval_minutes": _companion_interval}
 
 
-@app.get("/api/todos/reminders")
-async def todo_reminders():
-    """Return todos due within 10 minutes that haven't been reminded."""
-    return todo_store.get_pending_reminders(within_minutes=10)
-
-
-@app.post("/api/todos/{todo_id}/reminded")
-async def todo_mark_reminded(todo_id: str):
-    """Mark a todo as reminded."""
-    result = todo_store.mark_reminded(todo_id)
-    if not result:
-        raise HTTPException(404, "Todo not found")
-    return result
 
 
 # ── Static Files (production) ────────────────────────────
