@@ -56,10 +56,13 @@ class PersistentTodoStore(TodoStore):
         old_ids = {item.get("id") for item in self._items}
         result = super().write(todos, merge)
         self._save_to_file()
-        # Trigger deadline extraction for newly added todos
-        for item in self._items:
-            if item.get("id") not in old_ids and item.get("content"):
-                self._extract_deadline_async(item)
+        # Trigger deadline extraction for newly added todos (never block write)
+        try:
+            for item in self._items:
+                if item.get("id") not in old_ids and item.get("content"):
+                    self._extract_deadline_async(item)
+        except Exception as e:
+            print(f"[todo-reminder] Deadline hook error (non-fatal): {e}")
         return result
 
     def _extract_deadline_async(self, item: dict) -> None:

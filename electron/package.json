@@ -16,7 +16,7 @@
   },
   "build": {
     "appId": "com.hermes.desktop",
-    "productName": "Hermes",
+    "productName": "Hermes-nyx",
     "mac": {
       "icon": "icons/icon.icns",
       "category": "public.app-category.productivity",

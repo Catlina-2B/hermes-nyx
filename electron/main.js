@@ -215,7 +215,7 @@ function createMainWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: "Hermes",
+    title: "Hermes-nyx",
     backgroundColor: "#0a0e17",
     titleBarStyle: "hidden",
     trafficLightPosition: { x: 12, y: 14 },
@@ -748,7 +748,7 @@ function createTray() {
   );
 
   tray = new Tray(icon);
-  tray.setToolTip("Hermes");
+  tray.setToolTip("Hermes-nyx");
 
   const contextMenu = Menu.buildFromTemplate([
     {
