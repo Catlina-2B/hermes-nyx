@@ -370,12 +370,15 @@ class ChatManager:
             url = part.get("image_url", {}).get("url", "")
             if not url.startswith("data:"):
                 continue
-            # Save base64 image to temp file
+            # Save base64 image to temp file with correct extension
             b64_data = url.split(",", 1)[-1]
             img_bytes = base64.b64decode(b64_data)
+            # Detect format from data URL header (data:image/png;base64,...)
+            mime = url.split(";")[0].split(":")[1] if ":" in url else "image/png"
+            ext = {"image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp"}.get(mime, ".png")
             images_dir = Path.home() / ".hermes" / "images"
             images_dir.mkdir(parents=True, exist_ok=True)
-            tmp = tempfile.NamedTemporaryFile(suffix=".png", dir=str(images_dir), delete=False)
+            tmp = tempfile.NamedTemporaryFile(suffix=ext, dir=str(images_dir), delete=False)
             tmp.write(img_bytes)
             tmp.close()
             img_path = tmp.name
