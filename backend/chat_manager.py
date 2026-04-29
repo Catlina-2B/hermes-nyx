@@ -219,8 +219,13 @@ class ChatManager:
                     conversation_history=history,
                     stream_callback=on_stream_delta,
                 )
-                # After first call with history, agent owns its state
-                self._conversation_history = None
+                # Carry the resulting message list into the next turn — the
+                # agent does not read its own _session_messages back into
+                # run_conversation, so without this the next call starts
+                # with an empty history and forgets prior context.
+                updated = result.get("messages") if isinstance(result, dict) else None
+                if isinstance(updated, list) and updated:
+                    self._conversation_history = list(updated)
                 event_queue.put({
                     "type": "done",
                     "session_id": self._session_id,
