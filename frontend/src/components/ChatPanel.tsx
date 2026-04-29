@@ -1,15 +1,20 @@
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import type { ChatMessage, ToolCall, SessionInfo } from "../hooks/useChat";
+import SessionsDrawer from "./SessionsDrawer";
 
 interface Props {
   messages: ChatMessage[];
   streaming: boolean;
   sessions: SessionInfo[];
+  currentSessionId: string | null;
   onSend: (content: string) => void;
   onInterrupt: () => void;
   onNewSession: () => void;
   onSwitchSession: (id: string) => void;
+  onRenameSession: (id: string, title: string) => Promise<boolean>;
+  onDeleteSession: (id: string) => Promise<boolean>;
+  onOpenSessions: () => void;
 }
 
 function ToolCallItem({ tc }: { tc: ToolCall }) {
@@ -43,15 +48,24 @@ export default function ChatPanel({
   messages,
   streaming,
   sessions,
+  currentSessionId,
   onSend,
   onInterrupt,
   onNewSession,
   onSwitchSession,
+  onRenameSession,
+  onDeleteSession,
+  onOpenSessions,
 }: Props) {
   const [input, setInput] = useState("");
   const [showSessions, setShowSessions] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  function openSessions() {
+    onOpenSessions();
+    setShowSessions(true);
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -160,39 +174,48 @@ export default function ChatPanel({
             >
               NEW
             </button>
-            <div className="relative">
-              <button
-                onClick={() => setShowSessions(!showSessions)}
-                title="会话列表"
-                className="px-2 py-2 text-cyber-muted border border-cyber-border rounded-lg text-xs font-mono hover:text-cyber-text hover:border-cyber-text/30 transition-colors"
+            <button
+              onClick={openSessions}
+              title="历史会话"
+              aria-label="历史会话"
+              className="relative px-2 py-2 text-cyber-muted border border-cyber-border rounded-lg hover:text-cyber-text hover:border-cyber-text/30 transition-colors flex items-center gap-1.5"
+            >
+              {/* History icon (clock + arrow) drawn with svg */}
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
               >
-                |||
-              </button>
-              {showSessions && sessions.length > 0 && (
-                <div className="absolute bottom-full right-0 mb-1 w-56 bg-cyber-panel border border-cyber-border rounded-lg shadow-lg overflow-hidden z-50">
-                  <div className="max-h-48 overflow-y-auto">
-                    {sessions.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => {
-                          onSwitchSession(s.id);
-                          setShowSessions(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-[11px] font-mono text-cyber-text hover:bg-cyber-accent/10 border-b border-cyber-border/50 last:border-0 transition-colors"
-                      >
-                        <div className="truncate">{s.title}</div>
-                        <div className="text-cyber-muted text-[9px]">
-                          {s.message_count} msgs
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                <polyline points="3 3 3 8 8 8" />
+                <polyline points="12 7 12 12 15 14" />
+              </svg>
+              {sessions.length > 0 && (
+                <span className="text-[10px] font-mono leading-none text-cyber-muted/80">
+                  {sessions.length}
+                </span>
               )}
-            </div>
+            </button>
           </div>
         </div>
       </div>
+
+      <SessionsDrawer
+        open={showSessions}
+        sessions={sessions}
+        currentSessionId={currentSessionId}
+        onClose={() => setShowSessions(false)}
+        onSwitch={onSwitchSession}
+        onNew={onNewSession}
+        onRename={onRenameSession}
+        onDelete={onDeleteSession}
+      />
     </div>
   );
 }
