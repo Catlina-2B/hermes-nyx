@@ -246,20 +246,17 @@ class ChatManager:
 
         def run_agent():
             try:
-                # For multimodal (list) content, extract text for the agent
-                # and inject the full multimodal message into history
                 if isinstance(content, list):
+                    # Multimodal: pass list content directly as user_message
+                    # Agent's quiet_mode=True skips string operations on user_message
+                    # persist_user_message stores text-only version for history/logging
                     text_parts = [p["text"] for p in content if p.get("type") == "text"]
-                    text_msg = " ".join(text_parts) or "请看图片"
-                    # Inject multimodal message into conversation history
-                    if history is None:
-                        inject_history = [{"role": "user", "content": content}]
-                    else:
-                        inject_history = history + [{"role": "user", "content": content}]
+                    text_for_log = " ".join(text_parts) or "[图片]"
                     result = self._agent.run_conversation(
-                        user_message=text_msg,
-                        conversation_history=inject_history,
+                        user_message=content,
+                        conversation_history=history,
                         stream_callback=on_stream_delta,
+                        persist_user_message=text_for_log,
                     )
                 else:
                     result = self._agent.run_conversation(
