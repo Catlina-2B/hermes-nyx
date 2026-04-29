@@ -246,24 +246,26 @@ class ChatManager:
 
         def run_agent():
             try:
+                actual_history = history
+                actual_content = content
                 if isinstance(content, list):
-                    # Multimodal: pass list content directly as user_message
-                    # Agent's quiet_mode=True skips string operations on user_message
-                    # persist_user_message stores text-only version for history/logging
+                    # Multimodal: Agent can't accept list as user_message (string ops crash).
+                    # Strategy: put multimodal content into conversation_history as the
+                    # last user message, then send a short follow-up text as user_message.
+                    # The model sees both the image (from history) and the text prompt.
                     text_parts = [p["text"] for p in content if p.get("type") == "text"]
-                    text_for_log = " ".join(text_parts) or "[图片]"
-                    result = self._agent.run_conversation(
-                        user_message=content,
-                        conversation_history=history,
-                        stream_callback=on_stream_delta,
-                        persist_user_message=text_for_log,
-                    )
-                else:
-                    result = self._agent.run_conversation(
-                        user_message=content,
-                        conversation_history=history,
-                        stream_callback=on_stream_delta,
-                    )
+                    actual_content = " ".join(text_parts) or "请描述这张图片"
+                    multimodal_msg = {"role": "user", "content": content}
+                    assistant_ack = {"role": "assistant", "content": "好的，我看到了图片。"}
+                    if actual_history is None:
+                        actual_history = [multimodal_msg, assistant_ack]
+                    else:
+                        actual_history = actual_history + [multimodal_msg, assistant_ack]
+                result = self._agent.run_conversation(
+                    user_message=actual_content,
+                    conversation_history=actual_history,
+                    stream_callback=on_stream_delta,
+                )
                 # After first call with history, agent owns its state
                 self._conversation_history = None
                 event_queue.put({
