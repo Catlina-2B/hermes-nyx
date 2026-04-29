@@ -106,7 +106,7 @@ export default function ChatPanel({
                   </div>
                 )}
                 {msg.content && (
-                  <div className="prose prose-invert prose-sm max-w-none text-cyber-text text-sm [&_code]:bg-cyber-panel [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-cyber-accent [&_pre]:bg-cyber-panel [&_pre]:border [&_pre]:border-cyber-border [&_pre]:rounded-lg">
+                  <div className="prose prose-invert prose-sm max-w-none text-cyber-text text-sm prose-p:leading-relaxed prose-p:my-1.5 prose-headings:text-cyber-accent prose-headings:font-mono prose-headings:mt-4 prose-headings:mb-2 prose-strong:text-white prose-strong:font-semibold prose-em:text-cyan-300 prose-a:text-cyber-accent prose-a:no-underline hover:prose-a:underline prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-li:marker:text-cyber-accent/60 prose-blockquote:border-cyber-accent/30 prose-blockquote:text-cyber-muted prose-blockquote:not-italic prose-blockquote:my-2 prose-hr:border-cyber-border prose-code:bg-cyber-panel prose-code:text-cyber-accent prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:before:content-none prose-code:after:content-none prose-pre:bg-[#0a0e17] prose-pre:border prose-pre:border-cyber-border prose-pre:rounded-lg prose-pre:my-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-cyber-text">
                     <ReactMarkdown>{msg.content}</ReactMarkdown>
                   </div>
                 )}
