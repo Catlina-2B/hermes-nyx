@@ -409,32 +409,19 @@ function setupCompanionIPC() {
 // Screen Capture + Companion Loop
 // ---------------------------------------------------------------------------
 
-let screenPermissionDenied = false; // track if user already denied
+let screenCaptureFails = 0; // track consecutive failures
 
 async function captureScreen() {
-  const { systemPreferences } = require("electron");
   const win = mainWindow;
   if (!win) {
     console.log("[capture] No main window");
     return null;
   }
 
-  // Check screen recording permission
-  const screenAccess = systemPreferences.getMediaAccessStatus("screen");
-  if (screenAccess === "denied" || screenPermissionDenied) {
-    // User has explicitly denied — don't spam the dialog
-    if (!screenPermissionDenied) {
-      screenPermissionDenied = true;
-      if (companionWindow) {
-        companionWindow.webContents.send("companion:message", {
-          text: "需要录屏权限才能观察屏幕，请在系统设置 → 隐私与安全性 → 录屏中允许 Hermes-nyx",
-        });
-      }
-    }
-    console.log("[capture] Screen recording denied, skipping");
+  // After 3 consecutive failures, stop trying and notify user
+  if (screenCaptureFails >= 3) {
     return null;
   }
-  // "not-determined" or "granted" — let the system handle it (will prompt once if needed)
 
   try {
     const base64 = await win.webContents.executeJavaScript(`
@@ -464,15 +451,11 @@ async function captureScreen() {
 
     if (base64 && base64.length > 1000) {
       console.log(`[capture] getDisplayMedia OK (${Math.round(base64.length / 1024)}KB)`);
+      screenCaptureFails = 0;
       return base64;
     }
   } catch (e) {
     console.log("[capture] getDisplayMedia failed:", e.message);
-    // Re-check permission after failure — user may have denied the prompt
-    const postAccess = systemPreferences.getMediaAccessStatus("screen");
-    if (postAccess === "denied") {
-      screenPermissionDenied = true;
-    }
   }
 
   // Fallback: capture the app's own window
@@ -487,7 +470,13 @@ async function captureScreen() {
     console.log("[capture] capturePage failed:", e.message);
   }
 
-  console.log("[capture] All capture methods failed");
+  screenCaptureFails++;
+  console.log(`[capture] All capture methods failed (attempt ${screenCaptureFails}/3)`);
+  if (screenCaptureFails >= 3 && companionWindow) {
+    companionWindow.webContents.send("companion:message", {
+      text: "录屏权限未开启，请在系统设置 → 隐私与安全性 → 录屏中允许 Hermes-nyx，然后重启应用",
+    });
+  }
   return null;
 }
 
