@@ -28,7 +28,7 @@ def _get_gpu_name() -> str:
         return "N/A"
 
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.1.1"
 
 
 def _get_app_version() -> str:
