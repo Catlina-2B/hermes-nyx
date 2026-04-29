@@ -410,11 +410,23 @@ function setupCompanionIPC() {
 // ---------------------------------------------------------------------------
 
 async function captureScreen() {
-  // Use the main window's renderer process to capture via getDisplayMedia
-  // This is more reliable than desktopCapturer in Electron 35+
+  const { systemPreferences } = require("electron");
   const win = mainWindow;
   if (!win) {
     console.log("[capture] No main window");
+    return null;
+  }
+
+  // Check screen recording permission before attempting capture
+  const screenAccess = systemPreferences.getMediaAccessStatus("screen");
+  if (screenAccess !== "granted") {
+    console.log(`[capture] Screen recording not granted (status: ${screenAccess})`);
+    // Notify user once via companion bubble
+    if (companionWindow) {
+      companionWindow.webContents.send("companion:message", {
+        text: "需要录屏权限才能观察屏幕，请在系统设置 → 隐私与安全性 → 录屏中允许 Hermes",
+      });
+    }
     return null;
   }
 
