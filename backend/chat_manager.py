@@ -253,28 +253,86 @@ class ChatManager:
                 break
             yield event
 
-    def list_sessions(self, limit: int = 20) -> list[dict]:
-        """List recent WebUI sessions from DB."""
-        import sqlite3
+    def list_sessions(self, limit: int = 100) -> list[dict]:
+        """List recent WebUI sessions from DB.
+
+        Includes the timestamp of the most recent message (or session start
+        if empty) so the frontend can group/sort by activity rather than
+        creation time.
+        """
         try:
             conn = _db._conn
             cursor = conn.execute(
-                "SELECT id, title, message_count, started_at "
-                "FROM sessions WHERE source = 'web_ui' "
-                "ORDER BY started_at DESC LIMIT ?",
+                "SELECT s.id, s.title, s.message_count, s.started_at, "
+                "       (SELECT MAX(timestamp) FROM messages "
+                "        WHERE session_id = s.id) AS last_active "
+                "FROM sessions s WHERE s.source = 'web_ui' "
+                "ORDER BY COALESCE(last_active, s.started_at) DESC LIMIT ?",
                 (limit,),
             )
+            current_id = self._session_id
             return [
                 {
                     "id": row["id"],
-                    "title": row["title"] or row["id"],
+                    "title": row["title"] or self._derive_title(row["id"]),
+                    "has_custom_title": bool(row["title"]),
                     "message_count": row["message_count"] or 0,
                     "started_at": row["started_at"],
+                    "last_active": row["last_active"] or row["started_at"],
+                    "is_current": row["id"] == current_id,
                 }
                 for row in cursor.fetchall()
             ]
         except Exception:
             return []
+
+    @staticmethod
+    def _derive_title(session_id: str) -> str:
+        """Default title: short id slice when nothing better is set."""
+        if not session_id:
+            return "未命名"
+        suffix = session_id.split("_")[-1] if "_" in session_id else session_id
+        return f"会话 {suffix[:6]}"
+
+    def get_current_session_id(self) -> str | None:
+        return self._session_id
+
+    def rename_session(self, session_id: str, title: str) -> dict:
+        """Set or clear a session's title. Empty title clears it."""
+        try:
+            ok = _db.set_session_title(session_id, title)
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        except Exception as e:
+            return {"ok": False, "error": f"db error: {e}"}
+        if not ok:
+            return {"ok": False, "error": "session not found"}
+        return {"ok": True}
+
+    def delete_session(self, session_id: str) -> dict:
+        """Delete a session. If it's the current one, also clear runtime state."""
+        try:
+            deleted = _db.delete_session(session_id)
+        except Exception as e:
+            return {"ok": False, "error": f"db error: {e}"}
+        if not deleted:
+            return {"ok": False, "error": "session not found"}
+
+        if self._session_id == session_id:
+            if self._agent is not None:
+                try:
+                    self._agent.interrupt()
+                except Exception:
+                    pass
+            self._agent = None
+            self._session_id = None
+            self._conversation_history = None
+            try:
+                if SESSION_FILE.exists():
+                    SESSION_FILE.unlink()
+            except Exception:
+                pass
+        return {"ok": True}
 
     def switch_session(self, session_id: str) -> bool:
         """Switch to an existing session."""
