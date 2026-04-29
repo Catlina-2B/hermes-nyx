@@ -32,6 +32,11 @@ contextBridge.exposeInMainWorld("hermesDesktop", {
   // Spotlight controls
   hideSpotlight: () => ipcRenderer.send("spotlight:hide"),
   spotlightExpand: () => ipcRenderer.send("spotlight:expand"),
+  // Reminder
+  onReminderData: (callback) => {
+    ipcRenderer.on("reminder:data", (_event, data) => callback(data));
+  },
+  dismissReminder: (todoId) => ipcRenderer.send("reminder:dismiss", todoId),
   // Capture screen and ask question about it
   captureAndAsk: (question) => ipcRenderer.invoke("companion:capture-and-ask", question),
 

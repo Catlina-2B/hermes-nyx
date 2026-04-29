@@ -41,6 +41,8 @@ let companionDragStart = null; // { winX, winY } at drag start
 let companionTimerId = null;
 let companionEnabled = false;
 let companionIntervalMs = 1 * 60 * 1000; // 1 minute default
+let reminderTimerId = null;
+let reminderWindows = new Map(); // todoId -> BrowserWindow
 
 // ---------------------------------------------------------------------------
 // Python Backend
@@ -384,6 +386,23 @@ function setupCompanionIPC() {
       spotlightWindow.setSize(600, 420);
     }
   });
+
+  // Reminder dismiss
+  ipcMain.on("reminder:dismiss", async (_event, todoId) => {
+    console.log(`[reminder] Dismissed: ${todoId}`);
+    // Mark as reminded in backend
+    try {
+      await fetch(`${BACKEND_URL}/api/todos/${todoId}/reminded`, { method: "POST" });
+    } catch (e) {
+      console.error("[reminder] Failed to mark reminded:", e.message);
+    }
+    // Close the reminder window
+    const win = reminderWindows.get(todoId);
+    if (win && !win.isDestroyed()) {
+      win.close();
+    }
+    reminderWindows.delete(todoId);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -544,6 +563,86 @@ function stopCompanionLoop() {
     clearInterval(companionTimerId);
     companionTimerId = null;
     console.log("[companion] Loop stopped");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reminder Window (todo deadline popup)
+// ---------------------------------------------------------------------------
+
+function createReminderWindow(todo) {
+  if (reminderWindows.has(todo.id)) return; // already showing
+
+  const display = screen.getPrimaryDisplay();
+  const { width: screenW } = display.workAreaSize;
+  const winWidth = 300;
+  const winHeight = 150;
+  // Stack reminders vertically from top-right
+  const offset = reminderWindows.size * (winHeight + 10);
+
+  const win = new BrowserWindow({
+    width: winWidth,
+    height: winHeight,
+    x: screenW - winWidth - 20,
+    y: 40 + offset,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  const reminderURL = `${BACKEND_URL}/reminder.html`;
+  win.loadURL(reminderURL);
+  win.setVisibleOnAllWorkspaces(true);
+
+  // Send todo data once the page is ready
+  win.webContents.on("did-finish-load", () => {
+    win.webContents.send("reminder:data", {
+      id: todo.id,
+      content: todo.content,
+      deadline: todo.deadline,
+    });
+  });
+
+  win.on("closed", () => {
+    reminderWindows.delete(todo.id);
+  });
+
+  reminderWindows.set(todo.id, win);
+  console.log(`[reminder] Window created for: ${todo.content}`);
+}
+
+async function pollReminders() {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/todos/reminders`);
+    if (!response.ok) return;
+    const todos = await response.json();
+    for (const todo of todos) {
+      createReminderWindow(todo);
+    }
+  } catch (e) {
+    // Backend may not be ready yet, ignore
+  }
+}
+
+function startReminderPolling() {
+  if (reminderTimerId) return;
+  reminderTimerId = setInterval(pollReminders, 30000); // every 30s
+  pollReminders(); // immediate first check
+  console.log("[reminder] Polling started (30s interval)");
+}
+
+function stopReminderPolling() {
+  if (reminderTimerId) {
+    clearInterval(reminderTimerId);
+    reminderTimerId = null;
   }
 }
 
@@ -774,12 +873,14 @@ app.on("ready", async () => {
   setupCompanionIPC();
   registerGlobalShortcuts();
   createTray();
+  startReminderPolling();
 });
 
 app.on("before-quit", () => {
   isQuitting = true;
   globalShortcut.unregisterAll();
   stopBackend();
+  stopReminderPolling();
 });
 
 app.on("window-all-closed", () => {
