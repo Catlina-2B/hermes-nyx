@@ -2,6 +2,7 @@
 
 import os
 import json
+import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -42,8 +43,8 @@ def _get_model():
         return "gpt-4o"
 
 
-async def extract_deadline(content: str) -> str | None:
-    """Extract deadline from todo content. Returns ISO datetime string or None."""
+def _extract_deadline_sync(content: str) -> str | None:
+    """Synchronous deadline extraction (runs in thread pool)."""
     client = _get_client()
     if not client:
         return None
@@ -81,3 +82,9 @@ async def extract_deadline(content: str) -> str | None:
     except Exception as e:
         print(f"[todo-reminder] Failed to extract deadline: {e}")
         return None
+
+
+async def extract_deadline(content: str) -> str | None:
+    """Extract deadline from todo content. Runs sync OpenAI call in thread pool."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _extract_deadline_sync, content)
