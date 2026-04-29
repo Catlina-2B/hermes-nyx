@@ -78,17 +78,15 @@ fi
 
 # Mount and install
 echo -e "${C}  正在安装...${N}"
-MOUNT_POINT=$(hdiutil attach "$DMG_PATH" -nobrowse -quiet | tail -1 | awk '{print $NF}')
-if [ -z "$MOUNT_POINT" ] || [ ! -d "$MOUNT_POINT" ]; then
-  # Fallback: find mount point
-  MOUNT_POINT="/Volumes/${APP_NAME}"
+hdiutil attach "$DMG_PATH" -nobrowse -quiet
+# Find the actual mount point (volume name may differ)
+MOUNT_POINT=$(find /Volumes -maxdepth 1 -name "*ermes*" -type d 2>/dev/null | head -1)
+if [ -z "$MOUNT_POINT" ]; then
+  MOUNT_POINT=$(hdiutil info | grep "$DMG_PATH" -A 20 | grep "/Volumes/" | awk '{print $NF}')
 fi
 
-APP_SRC="${MOUNT_POINT}/${APP_NAME}.app"
-if [ ! -d "$APP_SRC" ]; then
-  # Try to find .app in mount point
-  APP_SRC=$(find "$MOUNT_POINT" -maxdepth 1 -name "*.app" | head -1)
-fi
+# Find .app inside mount point
+APP_SRC=$(find "$MOUNT_POINT" -maxdepth 1 -name "*.app" -type d 2>/dev/null | head -1)
 
 if [ -z "$APP_SRC" ] || [ ! -d "$APP_SRC" ]; then
   echo -e "${R}DMG 中未找到 .app 文件${N}"
