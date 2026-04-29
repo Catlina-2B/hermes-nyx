@@ -114,7 +114,37 @@ async def get_todos():
 
 @app.post("/api/todos")
 async def create_todo(body: TodoCreate):
-    return todo_store.add_todo(body.content)
+    todo = todo_store.add_todo(body.content)
+    content = body.content
+    # Extract deadline in background, update todo if found
+    asyncio.create_task(_extract_and_set_deadline(todo["id"], content))
+    return todo
+
+
+async def _extract_and_set_deadline(todo_id: str, content: str):
+    """Background task: extract deadline via LLM and update the todo."""
+    try:
+        deadline = await extract_deadline(content)
+        if deadline:
+            todo_store.update_todo(todo_id, deadline=deadline)
+            print(f"[todo-reminder] Set deadline for '{content}': {deadline}")
+    except Exception as e:
+        print(f"[todo-reminder] Extraction failed: {e}")
+
+@app.get("/api/todos/reminders")
+async def todo_reminders():
+    """Return todos due within 10 minutes that haven't been reminded."""
+    return todo_store.get_pending_reminders(within_minutes=10)
+
+
+@app.post("/api/todos/{todo_id}/reminded")
+async def todo_mark_reminded(todo_id: str):
+    """Mark a todo as reminded."""
+    result = todo_store.mark_reminded(todo_id)
+    if not result:
+        raise HTTPException(404, "Todo not found")
+    return result
+
 
 @app.patch("/api/todos/{todo_id}")
 async def update_todo(todo_id: str, body: TodoUpdate):
@@ -225,6 +255,18 @@ async def ws_chat(ws: WebSocket):
 
             if msg.get("type") == "send":
                 content = msg.get("content", "")
+                images = msg.get("images")  # list of base64 strings
+                if images:
+                    # Build multimodal content for the agent
+                    parts: list[dict] = []
+                    if content:
+                        parts.append({"type": "text", "text": content})
+                    for img_b64 in images:
+                        parts.append({
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{img_b64}"},
+                        })
+                    content = parts  # type: ignore
                 send_task = asyncio.create_task(do_send(content))
 
     except WebSocketDisconnect:
@@ -299,6 +341,7 @@ async def ws_logs(ws: WebSocket):
 # ── Companion API ────────────────────────────────────────
 
 from companion import analyze_screenshot, analyze_with_question, get_analysis_history
+from todo_reminder import extract_deadline
 
 
 class ScreenshotRequest(BaseModel):
@@ -361,6 +404,8 @@ async def companion_set_interval(minutes: int = 5):
     global _companion_interval
     _companion_interval = max(1, min(30, minutes))
     return {"interval_minutes": _companion_interval}
+
+
 
 
 # ── Static Files (production) ────────────────────────────

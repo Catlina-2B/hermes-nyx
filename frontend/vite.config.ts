@@ -14,6 +14,7 @@ export default defineConfig({
         main: resolve(__dirname, "index.html"),
         companion: resolve(__dirname, "companion.html"),
         spotlight: resolve(__dirname, "spotlight.html"),
+        reminder: resolve(__dirname, "reminder.html"),
       },
     },
   },

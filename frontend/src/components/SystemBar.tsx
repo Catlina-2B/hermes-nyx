@@ -100,7 +100,10 @@ export default function SystemBar({
           HERMES
         </span>
         <span className="text-cyan-400/30 text-xs font-mono">
-          {info ? `v${info.hermes_version}` : ""}
+          {info ? `v${info.app_version}` : ""}
+        </span>
+        <span className="text-cyan-400/20 text-[9px] font-mono">
+          {info?.hermes_version ? `hermes ${info.hermes_version}` : ""}
         </span>
         {/* Decorative dots */}
         <div className="flex gap-1 ml-2">

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import type { ChatMessage, ToolCall, SessionInfo } from "../hooks/useChat";
 import SessionsDrawer from "./SessionsDrawer";
@@ -8,7 +8,7 @@ interface Props {
   streaming: boolean;
   sessions: SessionInfo[];
   currentSessionId: string | null;
-  onSend: (content: string) => void;
+  onSend: (content: string, images?: string[]) => void;
   onInterrupt: () => void;
   onNewSession: () => void;
   onSwitchSession: (id: string) => void;
@@ -58,9 +58,11 @@ export default function ChatPanel({
   onOpenSessions,
 }: Props) {
   const [input, setInput] = useState("");
+  const [images, setImages] = useState<string[]>([]);
   const [showSessions, setShowSessions] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   function openSessions() {
     onOpenSessions();
@@ -72,9 +74,10 @@ export default function ChatPanel({
   }, [messages]);
 
   function handleSubmit() {
-    if (streaming || !input.trim()) return;
-    onSend(input.trim());
+    if (streaming || (!input.trim() && images.length === 0)) return;
+    onSend(input.trim(), images.length > 0 ? images : undefined);
     setInput("");
+    setImages([]);
     if (inputRef.current) inputRef.current.style.height = "auto";
   }
 
@@ -92,6 +95,47 @@ export default function ChatPanel({
     el.style.height = Math.min(el.scrollHeight, 160) + "px";
   }
 
+  const addImageFromFile = useCallback((file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(",")[1];
+      if (base64) setImages((prev) => [...prev, base64]);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  // Paste image from clipboard
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) addImageFromFile(file);
+        }
+      }
+    };
+    el.addEventListener("paste", onPaste);
+    return () => el.removeEventListener("paste", onPaste);
+  }, [addImageFromFile]);
+
+  // Drop image
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    for (const file of e.dataTransfer.files) {
+      addImageFromFile(file);
+    }
+  }, [addImageFromFile]);
+
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
+
   return (
     <div className="flex flex-col h-full">
       {/* Messages */}
@@ -108,6 +152,13 @@ export default function ChatPanel({
           <div key={i} className={msg.role === "user" ? "flex justify-end" : ""}>
             {msg.role === "user" ? (
               <div className="max-w-[80%] bg-cyber-accent/10 border border-cyber-accent/20 rounded-lg px-4 py-2 text-sm">
+                {msg.images && msg.images.length > 0 && (
+                  <div className="flex gap-2 mb-2 flex-wrap">
+                    {msg.images.map((img, idx) => (
+                      <img key={idx} src={`data:image/png;base64,${img}`} alt="" className="max-h-32 rounded-md border border-cyber-border" />
+                    ))}
+                  </div>
+                )}
                 {msg.content}
               </div>
             ) : (
@@ -120,7 +171,7 @@ export default function ChatPanel({
                   </div>
                 )}
                 {msg.content && (
-                  <div className="prose prose-invert prose-sm max-w-none text-cyber-text text-sm [&_code]:bg-cyber-panel [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-cyber-accent [&_pre]:bg-cyber-panel [&_pre]:border [&_pre]:border-cyber-border [&_pre]:rounded-lg">
+                  <div className="prose prose-invert prose-sm max-w-none text-cyber-text text-sm prose-p:leading-relaxed prose-p:my-1.5 prose-headings:text-cyber-accent prose-headings:font-mono prose-headings:mt-4 prose-headings:mb-2 prose-strong:text-white prose-strong:font-semibold prose-em:text-cyan-300 prose-a:text-cyber-accent prose-a:no-underline hover:prose-a:underline prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-li:marker:text-cyber-accent/60 prose-blockquote:border-cyber-accent/30 prose-blockquote:text-cyber-muted prose-blockquote:not-italic prose-blockquote:my-2 prose-hr:border-cyber-border prose-code:bg-cyber-panel prose-code:text-cyber-accent prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:before:content-none prose-code:after:content-none prose-pre:bg-[#0a0e17] prose-pre:border prose-pre:border-cyber-border prose-pre:rounded-lg prose-pre:my-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-cyber-text">
                     <ReactMarkdown>{msg.content}</ReactMarkdown>
                   </div>
                 )}
@@ -139,8 +190,42 @@ export default function ChatPanel({
       </div>
 
       {/* Input */}
-      <div className="shrink-0 border-t border-cyber-border p-3">
+      <div className="shrink-0 border-t border-cyber-border p-3" onDrop={onDrop} onDragOver={onDragOver}>
+        {/* Image preview */}
+        {images.length > 0 && (
+          <div className="flex gap-2 mb-2 flex-wrap">
+            {images.map((img, idx) => (
+              <div key={idx} className="relative group">
+                <img src={`data:image/png;base64,${img}`} alt="" className="h-16 rounded-md border border-cyber-border" />
+                <button
+                  onClick={() => setImages((prev) => prev.filter((_, i) => i !== idx))}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-cyber-error text-white text-[9px] leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  x
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            for (const f of e.target.files || []) addImageFromFile(f);
+            e.target.value = "";
+          }}
+        />
         <div className="flex items-end gap-2">
+          <button
+            onClick={() => fileRef.current?.click()}
+            title="添加图片 (也可粘贴或拖拽)"
+            className="shrink-0 px-2 py-2 text-cyber-muted border border-cyber-border rounded-lg text-sm hover:text-cyber-accent hover:border-cyber-accent/30 transition-colors"
+          >
+            +
+          </button>
           <textarea
             ref={inputRef}
             value={input}

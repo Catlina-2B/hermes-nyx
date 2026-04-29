@@ -28,7 +28,15 @@ def _get_gpu_name() -> str:
         return "N/A"
 
 
+APP_VERSION = "0.1.0"
+
+
+def _get_app_version() -> str:
+    return APP_VERSION
+
+
 def _get_hermes_version() -> str:
+    """Get Hermes Agent runtime version from pyproject.toml."""
     pyproject = HERMES_AGENT_DIR / "pyproject.toml"
     if not pyproject.exists():
         return "unknown"
@@ -47,6 +55,7 @@ _static_info = {
     "disk": f"{round(psutil.disk_usage('/').total / (1024**3))}GB",
     "gpu": _get_gpu_name(),
     "os": f"{platform.system()} {platform.release()}",
+    "app_version": _get_app_version(),
     "hermes_version": _get_hermes_version(),
 }
 

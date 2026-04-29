@@ -7,6 +7,7 @@ import type { ChatDirectiveHandler } from "../plugins/types";
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  images?: string[]; // base64 encoded images (user messages only)
   toolCalls?: ToolCall[];
 }
 
@@ -189,13 +190,17 @@ export function useChat(chatDirectiveRef?: MutableRefObject<ChatDirectiveHandler
     return () => ws.close();
   }, [chatDirectiveRef]);
 
-  const send = useCallback((content: string) => {
-    if (!content.trim()) return;
+  const send = useCallback((content: string, images?: string[]) => {
+    if (!content.trim() && (!images || images.length === 0)) return;
     pendingRef.current = { rawContent: "", content: "", tools: [], appliedDirectives: 0 };
-    setMessages((prev) => [...prev, { role: "user", content }]);
+    setMessages((prev) => [...prev, { role: "user", content, images }]);
     setStreaming(true);
     chatDirectiveRef?.current?.({ animation: "thinking" });
-    wsRef.current?.send({ type: "send", content });
+    const payload: Record<string, unknown> = { type: "send", content };
+    if (images && images.length > 0) {
+      payload.images = images;
+    }
+    wsRef.current?.send(payload);
   }, [chatDirectiveRef]);
 
   const interrupt = useCallback(() => {

@@ -90,6 +90,23 @@ function TodoItem({
   onToggle: (id: string, completed: boolean) => void;
   onRemove: (id: string) => void;
 }) {
+  function formatDeadline(iso: string) {
+    try {
+      const d = new Date(iso);
+      const now = new Date();
+      const isToday = d.toDateString() === now.toDateString();
+      const time = d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+      if (isToday) return time;
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      return `${month}/${day} ${time}`;
+    } catch {
+      return "";
+    }
+  }
+
+  const deadlineStr = todo.deadline ? formatDeadline(todo.deadline) : "";
+
   return (
     <div className="group flex items-center gap-2 py-1 text-xs font-mono">
       <button
@@ -109,6 +126,9 @@ function TodoItem({
       >
         {todo.content}
       </span>
+      {deadlineStr && !todo.completed && (
+        <span className="text-[9px] text-cyan-400/60 shrink-0">{deadlineStr}</span>
+      )}
       <button
         onClick={() => onRemove(todo.id)}
         className="text-cyber-muted hover:text-cyber-error opacity-0 group-hover:opacity-100 transition-opacity text-[10px]"

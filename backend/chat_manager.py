@@ -8,6 +8,8 @@ import uuid
 from pathlib import Path
 from typing import AsyncGenerator
 
+from todo_reminder import extract_deadline
+
 _BACKEND_DIR = str(Path(__file__).parent)
 HERMES_AGENT_DIR = os.path.expanduser("~/.hermes/hermes-agent")
 if HERMES_AGENT_DIR not in sys.path:
@@ -51,9 +53,39 @@ class PersistentTodoStore(TodoStore):
 
     def write(self, todos, merge=False):
         self._load_from_file()  # reload in case WebUI modified it
+        old_ids = {item.get("id") for item in self._items}
         result = super().write(todos, merge)
         self._save_to_file()
+        # Trigger deadline extraction for newly added todos (never block write)
+        try:
+            for item in self._items:
+                if item.get("id") not in old_ids and item.get("content"):
+                    self._extract_deadline_async(item)
+        except Exception as e:
+            print(f"[todo-reminder] Deadline hook error (non-fatal): {e}")
         return result
+
+    def _extract_deadline_async(self, item: dict) -> None:
+        """Fire-and-forget deadline extraction for a new todo item."""
+        import todo_store as ts
+
+        async def _do_extract():
+            try:
+                deadline = await extract_deadline(item.get("content", ""))
+                if deadline:
+                    ts.update_todo(item["id"], deadline=deadline)
+                    print(f"[todo-reminder] Agent todo deadline: {deadline}")
+            except Exception as e:
+                print(f"[todo-reminder] Agent todo extraction failed: {e}")
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(_do_extract())
+            else:
+                asyncio.run(_do_extract())
+        except RuntimeError:
+            pass
 
     def read(self):
         self._load_from_file()
@@ -176,7 +208,7 @@ class ChatManager:
             return _history_to_chat_messages(self._conversation_history)
         return []
 
-    async def send_message(self, content: str) -> AsyncGenerator[dict, None]:
+    async def send_message(self, content: str | list) -> AsyncGenerator[dict, None]:
         self._ensure_agent()
 
         event_queue: queue.Queue = queue.Queue()
@@ -214,8 +246,21 @@ class ChatManager:
 
         def run_agent():
             try:
+                actual_content = content
+                if isinstance(content, list):
+                    # Follow Hermes CLI approach: pre-analyze images via vision tool,
+                    # prepend descriptions to user text as plain string.
+                    print("[chat] Processing multimodal content with vision tool...")
+                    try:
+                        actual_content = self._preprocess_images(content)
+                        print(f"[chat] Vision preprocessing done: {actual_content[:100]}...")
+                    except Exception as ve:
+                        print(f"[chat] Vision preprocessing failed: {ve}")
+                        # Fallback: just send the text without image
+                        text_parts = [p["text"] for p in content if p.get("type") == "text"]
+                        actual_content = " ".join(text_parts) or "（图片处理失败）"
                 result = self._agent.run_conversation(
-                    user_message=content,
+                    user_message=actual_content,
                     conversation_history=history,
                     stream_callback=on_stream_delta,
                 )
@@ -365,6 +410,73 @@ class ChatManager:
         if store is None:
             return []
         return store.read()
+
+    def _preprocess_images(self, content: list) -> str:
+        """Analyze images via vision tool and return enriched text (same as Hermes CLI)."""
+        import base64
+        import tempfile
+        import asyncio as _asyncio
+        import json as _json
+
+        text_parts = [p["text"] for p in content if p.get("type") == "text"]
+        user_text = " ".join(text_parts) or ""
+
+        enriched_parts = []
+        for part in content:
+            if part.get("type") != "image_url":
+                continue
+            url = part.get("image_url", {}).get("url", "")
+            if not url.startswith("data:"):
+                continue
+            # Save base64 image to temp file with correct extension
+            b64_data = url.split(",", 1)[-1]
+            img_bytes = base64.b64decode(b64_data)
+            # Detect format from data URL header (data:image/png;base64,...)
+            mime = url.split(";")[0].split(":")[1] if ":" in url else "image/png"
+            ext = {"image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp"}.get(mime, ".png")
+            images_dir = Path.home() / ".hermes" / "images"
+            images_dir.mkdir(parents=True, exist_ok=True)
+            tmp = tempfile.NamedTemporaryFile(suffix=ext, dir=str(images_dir), delete=False)
+            tmp.write(img_bytes)
+            tmp.close()
+            img_path = tmp.name
+
+            try:
+                from tools.vision_tools import vision_analyze_tool
+                analysis_prompt = (
+                    "Describe everything visible in this image in thorough detail. "
+                    "Include any text, code, data, objects, people, layout, colors, "
+                    "and any other notable visual information."
+                )
+                result_json = _asyncio.run(
+                    vision_analyze_tool(image_url=img_path, user_prompt=analysis_prompt)
+                )
+                result = _json.loads(result_json)
+                if result.get("success"):
+                    description = result.get("analysis", "")
+                    enriched_parts.append(
+                        f"[The user attached an image. Here's what it contains:\n{description}]\n"
+                        f"[If you need a closer look, use vision_analyze with "
+                        f"image_url: {img_path}]"
+                    )
+                else:
+                    enriched_parts.append(
+                        f"[The user attached an image but it couldn't be analyzed. "
+                        f"You can try examining it with vision_analyze using "
+                        f"image_url: {img_path}]"
+                    )
+            except Exception as e:
+                enriched_parts.append(
+                    f"[The user attached an image but analysis failed ({e}). "
+                    f"You can try examining it with vision_analyze using "
+                    f"image_url: {img_path}]"
+                )
+                print(f"[chat] Vision analysis error: {e}")
+
+        if enriched_parts:
+            prefix = "\n\n".join(enriched_parts)
+            return f"{prefix}\n\n{user_text}" if user_text else prefix
+        return user_text or "请描述这张图片"
 
     def interrupt(self) -> None:
         if self._agent is not None:

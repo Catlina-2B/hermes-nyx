@@ -29,7 +29,6 @@ const DEFAULT_POSE = "hands_behind";
 const DEFAULT_DANCE_ANIMATION_PATH = "/animations/fbx/Arms Hip Hop Dance.fbx";
 const DANCE_ANIMATION_PATHS = [
   "/animations/fbx/Arms Hip Hop Dance.fbx",
-  "/animations/fbx/dance-2.fbx",
 ] as const;
 const THINKING_ANIMATION_PATH = "/animations/fbx/Thinking.fbx";
 const CODING_ANIMATION_PATH = "/animations/fbx/Sitting Idle.fbx";
@@ -44,7 +43,6 @@ const FBX_ANIMATION_ALIASES: Record<string, string> = {
   bye: "/animations/fbx/Standing Greeting.fbx",
   byebye: "/animations/fbx/Standing Greeting.fbx",
   coding: CODING_ANIMATION_PATH,
-  dance_2: "/animations/fbx/dance-2.fbx",
   female_standing_pose: "/animations/fbx/Female Standing Pose.fbx",
   goodbye: "/animations/fbx/Standing Greeting.fbx",
   greeting: "/animations/fbx/Standing Greeting.fbx",

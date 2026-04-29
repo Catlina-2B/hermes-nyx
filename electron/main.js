@@ -41,6 +41,8 @@ let companionDragStart = null; // { winX, winY } at drag start
 let companionTimerId = null;
 let companionEnabled = false;
 let companionIntervalMs = 1 * 60 * 1000; // 1 minute default
+let reminderTimerId = null;
+let reminderWindows = new Map(); // todoId -> BrowserWindow
 
 // ---------------------------------------------------------------------------
 // Python Backend
@@ -213,7 +215,7 @@ function createMainWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: "Hermes",
+    title: "Hermes-nyx",
     backgroundColor: "#0a0e17",
     titleBarStyle: "hidden",
     trafficLightPosition: { x: 12, y: 14 },
@@ -398,18 +400,40 @@ function setupCompanionIPC() {
       spotlightWindow.setSize(600, 420);
     }
   });
+
+  // Reminder dismiss
+  ipcMain.on("reminder:dismiss", async (_event, todoId) => {
+    console.log(`[reminder] Dismissed: ${todoId}`);
+    // Mark as reminded in backend
+    try {
+      await fetch(`${BACKEND_URL}/api/todos/${todoId}/reminded`, { method: "POST" });
+    } catch (e) {
+      console.error("[reminder] Failed to mark reminded:", e.message);
+    }
+    // Close the reminder window
+    const win = reminderWindows.get(todoId);
+    if (win && !win.isDestroyed()) {
+      win.close();
+    }
+    reminderWindows.delete(todoId);
+  });
 }
 
 // ---------------------------------------------------------------------------
 // Screen Capture + Companion Loop
 // ---------------------------------------------------------------------------
 
+let screenCaptureFails = 0; // track consecutive failures
+
 async function captureScreen() {
-  // Use the main window's renderer process to capture via getDisplayMedia
-  // This is more reliable than desktopCapturer in Electron 35+
   const win = mainWindow;
   if (!win) {
     console.log("[capture] No main window");
+    return null;
+  }
+
+  // After 3 consecutive failures, stop trying and notify user
+  if (screenCaptureFails >= 3) {
     return null;
   }
 
@@ -441,6 +465,7 @@ async function captureScreen() {
 
     if (base64 && base64.length > 1000) {
       console.log(`[capture] getDisplayMedia OK (${Math.round(base64.length / 1024)}KB)`);
+      screenCaptureFails = 0;
       return base64;
     }
   } catch (e) {
@@ -459,7 +484,13 @@ async function captureScreen() {
     console.log("[capture] capturePage failed:", e.message);
   }
 
-  console.log("[capture] All capture methods failed");
+  screenCaptureFails++;
+  console.log(`[capture] All capture methods failed (attempt ${screenCaptureFails}/3)`);
+  if (screenCaptureFails >= 3 && companionWindow) {
+    companionWindow.webContents.send("companion:message", {
+      text: "录屏权限未开启，请在系统设置 → 隐私与安全性 → 录屏中允许 Hermes-nyx，然后重启应用",
+    });
+  }
   return null;
 }
 
@@ -562,6 +593,86 @@ function stopCompanionLoop() {
 }
 
 // ---------------------------------------------------------------------------
+// Reminder Window (todo deadline popup)
+// ---------------------------------------------------------------------------
+
+function createReminderWindow(todo) {
+  if (reminderWindows.has(todo.id)) return; // already showing
+
+  const display = screen.getPrimaryDisplay();
+  const { width: screenW } = display.workAreaSize;
+  const winWidth = 300;
+  const winHeight = 150;
+  // Stack reminders vertically from top-right
+  const offset = reminderWindows.size * (winHeight + 10);
+
+  const win = new BrowserWindow({
+    width: winWidth,
+    height: winHeight,
+    x: screenW - winWidth - 20,
+    y: 40 + offset,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  const reminderURL = `${BACKEND_URL}/reminder.html`;
+  win.loadURL(reminderURL);
+  win.setVisibleOnAllWorkspaces(true);
+
+  // Send todo data once the page is ready
+  win.webContents.on("did-finish-load", () => {
+    win.webContents.send("reminder:data", {
+      id: todo.id,
+      content: todo.content,
+      deadline: todo.deadline,
+    });
+  });
+
+  win.on("closed", () => {
+    reminderWindows.delete(todo.id);
+  });
+
+  reminderWindows.set(todo.id, win);
+  console.log(`[reminder] Window created for: ${todo.content}`);
+}
+
+async function pollReminders() {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/todos/reminders`);
+    if (!response.ok) return;
+    const todos = await response.json();
+    for (const todo of todos) {
+      createReminderWindow(todo);
+    }
+  } catch (e) {
+    // Backend may not be ready yet, ignore
+  }
+}
+
+function startReminderPolling() {
+  if (reminderTimerId) return;
+  reminderTimerId = setInterval(pollReminders, 30000); // every 30s
+  pollReminders(); // immediate first check
+  console.log("[reminder] Polling started (30s interval)");
+}
+
+function stopReminderPolling() {
+  if (reminderTimerId) {
+    clearInterval(reminderTimerId);
+    reminderTimerId = null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Spotlight Window (Cmd+Shift+H)
 // ---------------------------------------------------------------------------
 
@@ -651,7 +762,7 @@ function createTray() {
   );
 
   tray = new Tray(icon);
-  tray.setToolTip("Hermes");
+  tray.setToolTip("Hermes-nyx");
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -788,12 +899,14 @@ app.on("ready", async () => {
   setupCompanionIPC();
   registerGlobalShortcuts();
   createTray();
+  startReminderPolling();
 });
 
 app.on("before-quit", () => {
   isQuitting = true;
   globalShortcut.unregisterAll();
   stopBackend();
+  stopReminderPolling();
 });
 
 app.on("window-all-closed", () => {

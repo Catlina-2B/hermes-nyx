@@ -5,6 +5,8 @@ export interface Todo {
   content: string;
   completed: boolean;
   created_at?: string;
+  deadline?: string | null;
+  reminded?: boolean;
 }
 
 const API = "/api/todos";
