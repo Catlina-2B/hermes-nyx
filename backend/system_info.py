@@ -29,15 +29,16 @@ def _get_gpu_name() -> str:
 
 
 def _get_hermes_version() -> str:
-    pyproject = HERMES_AGENT_DIR / "pyproject.toml"
-    if not pyproject.exists():
-        return "unknown"
-    try:
-        for line in pyproject.read_text().splitlines():
-            if line.strip().startswith("version"):
-                return line.split("=")[-1].strip().strip('"').strip("'")
-    except Exception:
-        pass
+    import json
+    from pathlib import Path
+    # Read version from our own frontend/package.json or electron/package.json
+    for rel in ["../frontend/package.json", "../electron/package.json"]:
+        pkg = Path(__file__).parent / rel
+        if pkg.exists():
+            try:
+                return json.loads(pkg.read_text()).get("version", "unknown")
+            except Exception:
+                continue
     return "unknown"
 
 
