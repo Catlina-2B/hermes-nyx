@@ -229,6 +229,18 @@ async def ws_chat(ws: WebSocket):
 
             if msg.get("type") == "send":
                 content = msg.get("content", "")
+                images = msg.get("images")  # list of base64 strings
+                if images:
+                    # Build multimodal content for the agent
+                    parts: list[dict] = []
+                    if content:
+                        parts.append({"type": "text", "text": content})
+                    for img_b64 in images:
+                        parts.append({
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{img_b64}"},
+                        })
+                    content = parts  # type: ignore
                 send_task = asyncio.create_task(do_send(content))
 
     except WebSocketDisconnect:

@@ -208,7 +208,7 @@ class ChatManager:
             return _history_to_chat_messages(self._conversation_history)
         return []
 
-    async def send_message(self, content: str) -> AsyncGenerator[dict, None]:
+    async def send_message(self, content: str | list) -> AsyncGenerator[dict, None]:
         self._ensure_agent()
 
         event_queue: queue.Queue = queue.Queue()
@@ -246,11 +246,27 @@ class ChatManager:
 
         def run_agent():
             try:
-                result = self._agent.run_conversation(
-                    user_message=content,
-                    conversation_history=history,
-                    stream_callback=on_stream_delta,
-                )
+                # For multimodal (list) content, extract text for the agent
+                # and inject the full multimodal message into history
+                if isinstance(content, list):
+                    text_parts = [p["text"] for p in content if p.get("type") == "text"]
+                    text_msg = " ".join(text_parts) or "请看图片"
+                    # Inject multimodal message into conversation history
+                    if history is None:
+                        inject_history = [{"role": "user", "content": content}]
+                    else:
+                        inject_history = history + [{"role": "user", "content": content}]
+                    result = self._agent.run_conversation(
+                        user_message=text_msg,
+                        conversation_history=inject_history,
+                        stream_callback=on_stream_delta,
+                    )
+                else:
+                    result = self._agent.run_conversation(
+                        user_message=content,
+                        conversation_history=history,
+                        stream_callback=on_stream_delta,
+                    )
                 # After first call with history, agent owns its state
                 self._conversation_history = None
                 event_queue.put({
